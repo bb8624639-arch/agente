@@ -30,13 +30,13 @@ pkg install python python-pip git nano curl
 ### 3. Obter o código (2 opções)
 **Opção A — seu repositório (recomendado p/ manter atualizado):**
 ```bash
-git clone SEU_REPO/agente-orquestrador.git
-cd agente-orquestrador
+git clone https://github.com/bb8624639-arch/agente.git
+cd agente
 ```
-Ou use o script pronto com a URL: `AE_REPO=SEU_REPO bash setup_termux.sh`
+Ou use o script pronto: `bash setup_termux.sh` (já aponta para o repo oficial).
 
 **Opção B — sem repositório ainda (para testar o setup):**
-Copie a pasta do projeto (via cabo USB/upload) para `$HOME/agente-orquestrador`.
+Copie a pasta do projeto (via cabo USB/upload) para `$HOME/agente`.
 
 ### 4. Configurar credenciais
 ```bash

@@ -8,7 +8,7 @@
 set -eu
 
 # Edite para o seu repositório quando existir:
-REPO="${AE_REPO:-https://github.com/SEU_USUARIO/agente-orquestrador.git}"
+REPO="${AE_REPO:-https://github.com/bb8624639-arch/agente.git}"
 
 echo "==> Atualizando pacotes do Termux"
 pkg update -y && pkg upgrade -y
