@@ -28,6 +28,28 @@ from .planner import planejar
 from .report import montar_relatorio, montar_handoff, salvar_handoff
 
 
+def _executar_criar_modulo(pedido: str) -> dict:
+    """Autoexpansão por script, com supervisão (pedido → rascunho aprovável)."""
+    from .gerador import gerar_modulo
+
+    r = gerar_modulo(pedido)
+    if not r.get("ok"):
+        return {"ok": False, "erro": r.get("erro", "falha ao gerar módulo"),
+                "status": "falha"}
+    ap_id = r.get("ap_id") or ""
+    msg = (f"📦 *Módulo gerado:* `{r['nome']}` v{r['versao']}\n"
+           f"Arquivo: `{r['caminho']}`\n"
+           f"Teste em sandbox: {'✅ passou' if r['teste'] is True else r['teste']}\n"
+           f"_Aguardando sua aprovação para publicar._\n"
+           f"Para aprovar: `/aprovado {ap_id}`" if ap_id else
+           f"📦 *Módulo gerado:* `{r['nome']}` v{r['versao']}\n"
+           f"Arquivo: `{r['caminho']}`\n"
+           f"Teste em sandbox: {'✅ passou' if r['teste'] is True else r['teste']}\n"
+           f"_Aguardando sua aprovação._")
+    return {"ok": True, "resultado": r, "status": "aprovacao",
+            "resposta_curta": msg}
+
+
 def _executar_cotacao() -> dict:
     from ..connectors.exchange import cotacao_dolar_hoje, formatar_cotacao
 
@@ -108,10 +130,14 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
         permissoes_necessarias=plano.get("permisoes", []),
     )
     try:
-        if approvals.requer_aprovacao({"acao": classificacao.acao,
-                                       "classe": classificacao.acao,
-                                       "efeito_externo": plano.get("aprovacao_necessaria", False)},
-                                      modo=cfg.modo):
+        # criar_modulo gera um rascunho local e cria UMA aprovação corporativa
+        # para publicar (dentro de _executar_criar_modulo). Não bloquear aqui:
+        # a aprovação da publicação acontece após a geração + teste em sandbox.
+        if classificacao.categoria != "criar_modulo" and approvals.requer_aprovacao(
+                {"acao": classificacao.acao,
+                 "classe": classificacao.acao,
+                 "efeito_externo": plano.get("aprovacao_necessaria", False)},
+                modo=cfg.modo):
             ap_id = approvals.criar_aprovacao(classificacao.acao, modulo=tarefa.modulo,
                                               contexto={"objetivo": pedido,
                                                         "comando": cfg.modo})
@@ -143,6 +169,11 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
     resultado, status, erro = {"ok": False}, "falha", ""
     if classificacao.categoria == "cotacao":
         resp = _executar_cotacao()
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
+    elif classificacao.categoria == "criar_modulo":
+        resp = _executar_criar_modulo(pedido)
         status = resp.get("status", "ok" if resp["ok"] else "falha")
         erro = resp.get("erro", "")
         resultado = resp

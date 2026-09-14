@@ -132,6 +132,18 @@ def _criar_esquema(conexao: sqlite3.Connection) -> None:
             dados         TEXT DEFAULT '{}',
             criado_em     REAL NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS conhecimento (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            topico        TEXT NOT NULL,
+            conteudo      TEXT NOT NULL,
+            fonte         TEXT DEFAULT '',
+            status        TEXT NOT NULL DEFAULT 'rascunho',  -- rascunho|aprovado|rejeitado
+            origem        TEXT DEFAULT 'usuario',  -- usuario|internet|agente
+            aprovado_por  TEXT DEFAULT '',
+            criado_em     REAL NOT NULL,
+            aprovado_em   REAL
+        );
         """
     )
 

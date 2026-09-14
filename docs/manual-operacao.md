@@ -92,6 +92,28 @@ python3 -m autoexpand.maintenance --ciclo
 ```
 Verifica saúde, roda testes, analisa logs, propõe correções (não auto-aplica as de risco).
 
+### Treinamento e autoexpansão supervisionada (Telegram)
+O agente aprende e se expande **somente com sua supervisão**. Todos os comandos
+enviados pelo Telegram:
+
+- `/treinar tópico: conteúdo` — ensina algo diretamente (fica marcado como seu;
+  entra como *aprovado* por ser instrução direta sua).
+- `/aprender tópico` — o agente **pesquisa na internet** (fonte pública), cria
+  um rascunho e **aguarda sua aprovação**.
+- `/aprovar_conh <id>` / `/rejeitar_conh <id>` — aprove/rejeite um aprendizado.
+- `/conhecimento` — lista o que o agente sabe (aprovados e rascunhos).
+- `/criar_modulo <descrição>` — **autoexpansão por script**: o agente gera o
+  arquivo em `autoexpand/plugins/`, testa no sandbox e **aguarda sua aprovação**
+  para publicar (ação de `publicar_modulo`, sempre supervisionada).
+- `/aprovado <id>` / `/recusar <id>` — decide aprovações de publicação de
+  módulos e outras ações sensíveis.
+- `/modulos` — lista módulos registrados e seu status (rascunho/publicado).
+- `/status` — mostra aprovações pendentes + conhecimentos aguardando.
+
+Fluxo completo de expansão: pedido → classificação → geração do rascunho →
+teste em sandbox → sua aprovação → publicação versionada (registry). Nenhuma
+permissão é auto-concedida.
+
 ### Testes
 ```bash
 python3 -m pytest -q

@@ -21,6 +21,7 @@ import requests
 
 from ..config import carregar_config, salvar_config
 from ..core import approvals, budget, journal
+from ..core import knowledge as conhecimento
 from ..orchestrator.executor import executar_pedido
 
 # Carrega .env (raiz do projeto) se existir — credenciais nunca versionadas.
@@ -108,6 +109,68 @@ def _handle(corpo: dict) -> None:
             if restante:
                 linha = approvals.decidir(restante, False, por="telegram")
                 _enviar(chat_id, f"Aprovação {restante}: {linha['status']}" if linha else "id inválido")
+        elif comando == "aprovar_conh" or comando == "aprovarconh":
+            if restante:
+                resultado = conhecimento.decidir(int(restante), True, por="telegram")
+                _enviar(chat_id, f"Conhecimento #{restante}: {resultado['status']}" if resultado.get("status") != "inexistente" else "id inexistente")
+        elif comando == "rejeitar_conh" or comando == "rejeitarconh":
+            if restante:
+                resultado = conhecimento.decidir(int(restante), False, por="telegram")
+                _enviar(chat_id, f"Conhecimento #{restante}: {resultado['status']}" if resultado.get("status") != "inexistente" else "id inexistente")
+        elif comando == "conhecimento":
+            lista = conhecimento.listar("rascunho") + conhecimento.listar("aprovado")
+            if not lista:
+                _enviar(chat_id, "Nenhum conhecimento cadastrado.")
+            else:
+                linhas = []
+                for k in lista[:10]:
+                    estado = "✅" if k["status"] == "aprovado" else ("⏳" if k["status"] == "rascunho" else "❌")
+                    linhas.append(f"{estado} #{k['id']} {k['topico']} ({k['status']})")
+                _enviar(chat_id, "Conhecimentos:\n" + "\n".join(linhas))
+        elif comando == "treinar":
+            if not restante or ":" not in restante:
+                _enviar(chat_id, "Uso: /treinar tópico: conteúdo")
+                return
+            topico, _, conteudo = restante.partition(":")
+            try:
+                id_criado = conhecimento.registrar(topico, conteudo, origem="usuario")
+                _enviar(chat_id, f"✅ Ensinado! Conhecimento #{id_criado} aprovado (origem: você).")
+            except ValueError as exc:
+                _enviar(chat_id, f"Erro: {exc}")
+        elif comando == "aprender":
+            if not restante:
+                _enviar(chat_id, "Uso: /aprender tópico (ex.: /aprender automação comercial)")
+                return
+            _enviar(chat_id, f"🔎 Pesquisando '{restante}' na internet...")
+            resultado = conhecimento.aprender_e_registrar(restante)
+            if "erro" in resultado:
+                _enviar(chat_id, f"❌ {resultado['erro']}")
+            else:
+                _enviar(chat_id,
+                        f"📚 *Aprendizado # {resultado['id']}*\n"
+                        f"*Tópico:* {resultado['topico']}\n"
+                        f"*Fonte:* {resultado['fonte']}\n"
+                        f"*Resumo:* {resultado['conteudo']}\n\n"
+                        f"{resultado['aviso']}")
+        elif comando in ("criar_modulo", "criarmodulo") or comando == "modulo":
+            if not restante:
+                _enviar(chat_id, "Uso: /criar_modulo <descrição> (ex.: /criar_modulo script que valida CPF)")
+                return
+            resposta_nova = executar_pedido(f"crie um {restante}")
+            curt = resposta_nova["relatorio"].get("0_resposta_curta", "")
+            _enviar(chat_id, curt or resposta_nova["relatorio"]["11_relatorio_de_execucao"]["status"])
+        elif comando == "modulos" or comando == "listar_modulos":
+            from ..core import persistence
+            linhas = persistence.consultar(
+                "SELECT nome, versao, perfil, aprovado FROM modulos "
+                "WHERE status='ativo' ORDER BY nome, versao", ())
+            if not linhas:
+                _enviar(chat_id, "Nenhum módulo publicado ainda.")
+            else:
+                texto_mod = "Módulos:\n" + "\n".join(
+                    f"`{l['nome']}` v{l['versao']} ({l['perfil']}{'✅' if l['aprovado'] else '⏳'})"
+                    for l in linhas[-15:])
+                _enviar(chat_id, texto_mod)
         elif comando == "status":
             pend = approvals.pendentes()
             if pend:
@@ -115,6 +178,10 @@ def _handle(corpo: dict) -> None:
                     f"`{p['id']}` {p['acao']}" for p in pend))
             else:
                 _enviar(chat_id, "Nenhuma aprovação pendente.")
+            pend_conh = conhecimento.listar("rascunho")
+            if pend_conh:
+                _enviar(chat_id, "Conhecimentos aguardando:\n" + "\n".join(
+                    f"#{k['id']} {k['topico']} (/aprovar_conh {k['id']})" for k in pend_conh[:5]))
         elif comando == "emergencia":
             cfg = carregar_config()
             cfg.emergencia = True

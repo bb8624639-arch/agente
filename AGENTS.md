@@ -12,10 +12,13 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
 - `autoexpand/config.py` — constantes centrais + `carregar_config()/salvar_config()`.
 - `autoexpand/core/` — persistence (SQLite), registry (versões/rollback),
   budget (limites), approvals (fila humana), journal (diário), execution
-  (3 tentativas + anti-loop + bloqueio), permissions/plugin/validation/sandbox_runner.
+  (3 tentativas + anti-loop + bloqueio), permissions/plugin/validation/sandbox_runner,
+  knowledge (memória de aprendizado com supervisão), connectors/exchange (PTAX/BCB).
 - `autoexpand/economy/` — llm.py (adaptador desligável) e router.py (3 níveis + cache).
 - `autoexpand/orchestrator/` — classifier.py (regras), planner.py (templates),
-  executor.py (pipeline pedido→relatório), report.py (formato 11 itens + handoff).
+  executor.py (pipeline pedido→relatório), report.py (formato 11 itens + handoff),
+  gerador.py (autoexpansão por scripts com aprovação).
+- `autoexpand/plugins/` — código-fonte dos módulos gerados (rascunho → aprovado).
 - `autoexpand/browser/` — allowlist + leitor somente leitura.
 - `autoexpand/{web,telegram,n8n,android}/` — API Flask, bot Telegram, adaptador n8n
   (mock sem credenciais), contrato Automate (inativo).
@@ -23,13 +26,15 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
 - `main.py` — CLI.
 
 ## Comandos
-- Testes: `python3 -m pytest -q` (49 testes; deve passar 100%).
+- Testes: `python3 -m pytest -q` (58+ testes; deve passar 100%).
 - Rodar orquestrador: `python3 main.py "pedido"` (modo padrão: `teste`, nada real).
 - Modos: `teste` | `autonomo_controlado` | `producao_protegida` | `emergencia`
   (flag `--modo` ou env `AE_MODO`).
 - API: `python3 -m autoexpand.web.api` (porta 8080; token via env `AE_API_TOKEN`).
 - Telegram: `./run_bot.sh start` (serviço persistente) ou
   `python3 -m autoexpand.telegram.bot` (direto; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` no `.env`).
+  Comandos de treinamento/expansão: `/treinar`, `/aprender`, `/aprovar_conh`,
+  `/rejeitar_conh`, `/conhecimento`, `/criar_modulo`, `/modulos`.
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.
 - Tripé de serviços: `./servicos.sh {start|stop|restart|status}` (bot + API + manutenção,
   cada um com auto-restart via `run_*.sh`; logs/PIDs em `state/`).
