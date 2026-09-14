@@ -6,3 +6,8 @@ __pycache__/
 
 # credenciais locais (não versionar)
 .env
+
+# módulos gerados pela autoexpansão ( /criar_modulo) — locais até o usuário
+# decidir versionar; mantém-se o .gitkeep.
+autoexpand/plugins/*
+!autoexpand/plugins/.gitkeep
