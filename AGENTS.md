@@ -31,6 +31,10 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
 - Telegram: `./run_bot.sh start` (serviço persistente) ou
   `python3 -m autoexpand.telegram.bot` (direto; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` no `.env`).
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.
+- Tripé de serviços: `./servicos.sh {start|stop|restart|status}` (bot + API + manutenção,
+  cada um com auto-restart via `run_*.sh`; logs/PIDs em `state/`).
+- Android/Termux: `bash setup_termux.sh` + docs/rodando-termux.md (Telegram é o controle
+  remoto; Termux é onde o agente roda localmente no celular).
 - Estado vive em `state/` (SQLite `agente.db`, `config.json`, handoffs `*.md`).
 
 ## Invariantes (não quebrar)

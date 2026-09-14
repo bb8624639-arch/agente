@@ -35,6 +35,22 @@ curl localhost:8080/api/limites
 ```
 Auth opcional via variável `AE_API_TOKEN` (Bearer). Endpoints em `docs/contrato-painel.md`.
 
+### Tripé de serviços persistentes (painel + bot + manutenção)
+```bash
+./servicos.sh start        # sobe os três (bot, API, manutenção)
+./servicos.sh stop
+./servicos.sh restart
+./servicos.sh status
+```
+Individualmente:
+```bash
+./run_bot.sh status        # bot Telegram
+./run_api.sh status        # API do painel (porta 8080)
+./run_maintenance.sh status# agente de manutenção (intervalo via AE_MAINT_INTERVALO)
+```
+- Cada `run_*.sh` tem `start|stop|restart|status` e auto-restart se o processo cair.
+- Logs/PIDs em `state/*.log` e `state/*.pid`.
+
 ### Telegram (opcional)
 ```bash
 export TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
@@ -60,6 +76,15 @@ O bot tem auto-restart independente do navegador/painel: é um serviço à parte
   é container sem systemd rodando).
 - Observação: como depois de remover o webhook os comandos via polling do bot
   funcionam, esta é a segunda via de operação caso o navegador/painel caia.
+
+### Termux vs Telegram (para rodar localmente)
+- **Telegram** é sempre o controle remoto: você comanda o agente de qualquer lugar.
+- **Termux** (Android) é um ambiente Linux local para *hospedar* o agente no seu
+  celular. Só é necessário se você quiser que o agente rode no seu aparelho, sem
+  servidor externo.
+- Se o agente já está rodando num servidor (como o All Hands), **apenas o Telegram
+  basta** para operá-lo.
+- Detalhes de instalação no Termux: `docs/rodando-termux.md` (ou `bash setup_termux.sh`).
 
 ### Manutenção contínua
 ```bash
