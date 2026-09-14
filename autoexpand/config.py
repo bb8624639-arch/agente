@@ -11,8 +11,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parent.parent          # autoexpand/
-PROJETO = RAIZ.parent                                   # /workspace/project
+# config.py vive em <PROJETO>/autoexpand/config.py
+PROJETO = Path(__file__).resolve().parent.parent          # /workspace/project
 PASTA_ESTADO = Path(os.environ.get("AE_STATE_DIR", PROJETO / "state"))
 PASTA_PLUGINS = PROJETO / "autoexpand" / "plugins"
 BANCO = PASTA_ESTADO / "orquestrador.db"
