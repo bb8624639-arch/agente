@@ -42,6 +42,25 @@ python3 -m autoexpand.telegram.bot
 ```
 Comandos: `/aprovado <id>` · `/recusar <id>` · `/status` · `/emergencia`.
 
+### Serviço persistente do bot (segunda via quando o painel/navegador falhar)
+O bot tem auto-restart independente do navegador/painel: é um serviço à parte
+(loop p/ reinício automático).
+
+```bash
+./run_bot.sh start      # inicia + mantém vivo (reinicia se cair)
+./run_bot.sh stop       # para
+./run_bot.sh restart
+./run_bot.sh status     # confere (mostra wrapper + processo python)
+```
+
+- PID em `state/telegram_bot.pid`; log em `state/telegram_bot.log`.
+- Credenciais no `.env` (chmod 600, fora do git): `TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_CHAT_ID`.
+- `run_bot.sh` usa apenas `python3` e ferramentas padrão (sem systemd — o ambiente
+  é container sem systemd rodando).
+- Observação: como depois de remover o webhook os comandos via polling do bot
+  funcionam, esta é a segunda via de operação caso o navegador/painel caia.
+
 ### Manutenção contínua
 ```bash
 python3 -m autoexpand.maintenance --ciclo

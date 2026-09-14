@@ -15,12 +15,22 @@ from __future__ import annotations
 import json
 import os
 import time
+from pathlib import Path
 
 import requests
 
 from ..config import carregar_config, salvar_config
 from ..core import approvals, budget, journal
 from ..orchestrator.executor import executar_pedido
+
+# Carrega .env (raiz do projeto) se existir — credenciais nunca versionadas.
+_ENV = Path(__file__).resolve().parent.parent.parent / ".env"
+if _ENV.exists():
+    for linha in _ENV.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if linha and not linha.startswith("#") and "=" in linha:
+            chave, _, valor = linha.partition("=")
+            os.environ.setdefault(chave.strip(), valor.strip())
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_AUTORIZADO = os.environ.get("TELEGRAM_CHAT_ID", "")

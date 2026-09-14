@@ -28,7 +28,8 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
 - Modos: `teste` | `autonomo_controlado` | `producao_protegida` | `emergencia`
   (flag `--modo` ou env `AE_MODO`).
 - API: `python3 -m autoexpand.web.api` (porta 8080; token via env `AE_API_TOKEN`).
-- Telegram: `python3 -m autoexpand.telegram.bot` (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`).
+- Telegram: `./run_bot.sh start` (serviço persistente) ou
+  `python3 -m autoexpand.telegram.bot` (direto; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` no `.env`).
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.
 - Estado vive em `state/` (SQLite `agente.db`, `config.json`, handoffs `*.md`).
 
