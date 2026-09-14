@@ -24,24 +24,28 @@ class LimiteExcedido(Exception):
         super().__init__(motivo)
 
 
+_TAREFA_ATUAL: str = "default"
+
+
 def _periodos(agora: dt.datetime | None = None) -> tuple[str, str, str]:
     agora = agora or dt.datetime.now()
-    return (f"tarefa:{_tarefa_atual()}", f"dia:{agora:%Y-%m-%d}", f"mes:{agora:%Y-%m}")
+    return (f"tarefa:{_TAREFA_ATUAL}", f"dia:{agora:%Y-%m-%d}", f"mes:{agora:%Y-%m}")
 
 
 def _tarefa_atual() -> str:
-    return getattr(_tarefa_atual, "atual", "default")
+    return _TAREFA_ATUAL
 
 
 def iniciar_tarefa() -> str:
     """Cria um id único de tarefa para contabilizar o orçamento por tarefa."""
-    tarefa = uuid.uuid4().hex[:12]
-    _tarefa_atual.atual = tarefa
-    return tarefa
+    global _TAREFA_ATUAL
+    _TAREFA_ATUAL = uuid.uuid4().hex[:12]
+    return _TAREFA_ATUAL
 
 
 def encerrar_tarefa() -> None:
-    _tarefa_atual.atual = "default"
+    global _TAREFA_ATUAL
+    _TAREFA_ATUAL = "default"
 
 
 def _ler(periodo: str) -> dict:
@@ -115,7 +119,8 @@ def verificar_limites(*, paginas_futuras: int = 0, chamadas_ia_futuras: int = 0,
          MAX_CHAMADAS_IA_POR_TAREFA),
     ]
     for nome, valor, teto in checks:
-        if valor > teto:
+        # "bloquear automaticamente ao atingir o limite": igualdade também bloqueia.
+        if valor + 1e-9 >= teto:
             raise LimiteExcedido(
                 f"{nome}: {valor:g} ultrapassa teto {teto:g} "
                 f"(modo={MODO_PADRAO}; uso acumulado: tarefa={_custo_ate(tarefa):g} R$, "

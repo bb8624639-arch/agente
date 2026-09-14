@@ -88,8 +88,6 @@ def salvar_config(cfg: Config) -> None:
 def _unidade(moeda: str) -> str:
     return {"R$": "reais", "USD": "dólares", "BRL": "reais"}.get(moeda, moeda)
 
-# Documentação: onde aparecer "anos 60" tratar como "60 segundos" — ver
-# README/nota de nomes; aqui nada a corrigir (constante numérica acima).
 
 def limites_json() -> dict:
     return {

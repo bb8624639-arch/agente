@@ -38,7 +38,15 @@ def _executar_leitura(plano: dict, pedido: str) -> dict:
         # "não sei" honesto: não inventamos URL.
         return {"ok": False, "erro": "nenhuma URL identificada no pedido; "
                                      "informe uma URL autorizada", "status": "desambiguacao"}
-    resultado = ler_pagina_autorizada(PedidoLeitura(url=urls[0]))
+    from ..browser.allowed import SiteNaoAutorizado
+    try:
+        resultado = ler_pagina_autorizada(PedidoLeitura(url=urls[0]))
+    except SiteNaoAutorizado as exc:
+        # site fora da allowlist: falha de autorização (nunca auto-adicionar)
+        return {"ok": False, "erro": f"site não autorizado: {exc.url}",
+                "status": "bloqueada"}
+    except ErroLeitura as exc:
+        return {"ok": False, "erro": str(exc), "status": "falha"}
     return {"ok": True, "resultado": resultado, "status": "ok"}
 
 
@@ -119,7 +127,9 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
     resultado, status, erro = {"ok": False}, "falha", ""
     if plano.get("ferramentas") and "browser/reader" in plano["ferramentas"]:
         resp = _executar_leitura(plano, pedido)
-        resultado, status, erro = resp, ("ok" if resp["ok"] else "falha"), resp.get("erro", "")
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
     else:
         resultado = {"ok": False, "erro": "adaptador não implementado no MVP"}
         status = "falha"

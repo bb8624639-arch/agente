@@ -24,14 +24,15 @@ CLASSIFICACAO_ACAO = {
     "pagamento": "pagamentos", "pix": "pix", "reembolso": "reembolsos",
     "cartao": "cartao", "contratar": "contratacao_servicos",
     "credencial": "credenciais", "excluir_dados": "exclusao_definitiva",
+    "exclusao_definitiva": "exclusao_definitiva",
     "enviar_em_massa": "mensagens_em_massa", "publicar_conteudo": "publicacao_conteudo",
-    "alterar_preco": "alteracao_precos", "contato_comercial": "contato_comercial",
+    "alterar_preco": "alteracao_precos", "alteracao_preco": "alteracao_precos",
+    "contato_comercial": "contato_comercial", "contatar_cliente": "contato_comercial",
     "conta_terceiros": "contas_terceiros", "fora_allowlist": "fora_da_allowlist",
     "alterar_regras": "alterar_regras_seguranca", "aumentar_orcamento": "aumento_orcamento",
     "publicar_modulo": "publicacao_modulo",
     "deploy_producao": "deploy_producao",
     "enviar_mensagem": "envio_mensagem",
-    "contatar_cliente": "contato_comercial",
 }
 
 
