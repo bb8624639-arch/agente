@@ -16,34 +16,46 @@
 Se você quiser seu agente "autônomo" rodando 24/7 no celular (sem depender da
 nuvem), instale o Termux:
 
-### 1. Instalar
-- Baixe o **Termux** na F-Droid (ou GitHub oficial), não na Play Store (versão
-  antiga).
+### 1. Instalar o Termux
+- **Baixe do F-Droid**: `https://f-droid.org/pt/packages/com.termux/`
+  (a versão da Play Store é desatualizada e não funciona bem).
+- Alternativa: GitHub oficial → `https://github.com/termux/termux-app/releases`.
+
+### 2. Preparar o ambiente
 ```bash
 pkg update && pkg upgrade -y
-pkg install python python-pip git
-pip install flask requests beautifulsoup4 pytest
+pkg install python python-pip git nano curl
 ```
-- Ou rode o script pronto: `bash setup_termux.sh` (clona o projeto e prepara o `.env`).
 
-### 2. Obter o código
+### 3. Obter o código (2 opções)
+**Opção A — seu repositório (recomendado p/ manter atualizado):**
 ```bash
 git clone SEU_REPO/agente-orquestrador.git
 cd agente-orquestrador
 ```
+Ou use o script pronto com a URL: `AE_REPO=SEU_REPO bash setup_termux.sh`
 
-### 3. Configurar credenciais
+**Opção B — sem repositório ainda (para testar o setup):**
+Copie a pasta do projeto (via cabo USB/upload) para `$HOME/agente-orquestrador`.
+
+### 4. Configurar credenciais
 ```bash
 nano .env   # preencha TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID
 ```
 
-### 4. Rodar os serviços
+### 5. Instalar dependências
+```bash
+pip install -r requirements.txt    # ou via setup_termux.sh
+python3 -m pytest -q               # 62 testes devem passar
+```
+
+### 6. Rodar os serviços
 ```bash
 ./servicos.sh start          # bot + API + manutenção
 ./servicos.sh status
 ```
 
-### 5. Manter ativo quando fechar o Termux (opcional)
+### 7. Manter ativo quando fechar o Termux (opcional)
 Use `tmux` para não perder os processos ao minimizar o app:
 ```bash
 pkg install tmux
@@ -52,7 +64,7 @@ tmux new -s agente
 # Ctrl+b d para desanexar; voltar: tmux attach -t agente
 ```
 Alternativa mais robusta: habilitar "Acorda dispositivo" nas opções do Termux e
-usar `termux-wake-lock` (com Termux:API).
+usar `termux-wake-lock` (com Termux:API)
 
 ## Limitações conhecidas do Termux
 - O Android pode pausar processos em segundo plano (bateria). Use `termux-wake-lock`

@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Instala o Agente Orquestrador no Termux (Android) de forma automatizada.
 # Uso: bash setup_termux.sh
+#
+# IMPORTANTE: o projeto ainda não tem repositório remoto. Antes de rodar este
+# script, aponte a variável REPO abaixo para o seu repositório (ou rode
+# `bash setup_termux.sh` já DENTRO do diretório do projeto clonado).
 set -eu
+
+# Edite para o seu repositório quando existir:
+REPO="${AE_REPO:-https://github.com/SEU_USUARIO/agente-orquestrador.git}"
 
 echo "==> Atualizando pacotes do Termux"
 pkg update -y && pkg upgrade -y
@@ -9,15 +16,29 @@ pkg update -y && pkg upgrade -y
 echo "==> Instalando Python e ferramentas"
 pkg install -y python python-pip git nano curl
 
-echo "==> Instalando dependências do agente"
-pip install flask requests beautifulsoup4 pytest
+echo "==> Instalando dependências do agente (requirements.txt)"
+pip install --upgrade pip
+if [ -d "$HOME/agente-orquestrador" ]; then
+  cd "$HOME/agente-orquestrador"
+else
+  pip install flask requests beautifulsoup4
+fi
 
-echo "==> Clonando o projeto (se ainda não existir)"
+echo "==> Obtendo o projeto"
 if [ ! -d "$HOME/agente-orquestrador" ]; then
+  if echo "$REPO" | grep -q "SEU_USUARIO"; then
+    echo "!!! Ajuste a variável REPO (no topo deste script) para o seu repositório."
+    echo "    Ou copie apenas os arquivos do projeto para $HOME/agente-orquestrador"
+    exit 1
+  fi
   cd "$HOME"
-  git clone https://github.com/SEU_USUARIO/agente-orquestrador.git
+  git clone "$REPO" agente-orquestrador
 fi
 cd "$HOME/agente-orquestrador"
+
+if [ -f requirements.txt ]; then
+  pip install -r requirements.txt
+fi
 
 echo "==> Criando .env (não commitável) — preencha com suas credenciais"
 if [ ! -f .env ]; then
