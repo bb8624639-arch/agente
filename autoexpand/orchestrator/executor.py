@@ -28,6 +28,22 @@ from .planner import planejar
 from .report import montar_relatorio, montar_handoff, salvar_handoff
 
 
+def _executar_cotacao() -> dict:
+    from ..connectors.exchange import cotacao_dolar_hoje, formatar_cotacao
+
+    cot = cotacao_dolar_hoje()
+    if "erro" in cot:
+        dados = {"compra": None, "venda": None, "fonte": "PTAX/BCB",
+                 "erro": cot["erro"]}
+        journal.registrar_execucao(modulo="connectors/exchange", status="falha",
+                                   plano=None, resultado=dados, erro=cot["erro"])
+        return {"ok": False, "erro": cot["erro"], "status": "falha"}
+    journal.registrar_execucao(modulo="connectors/exchange", status="ok",
+                               plano=None, resultado=cot)
+    return {"ok": True, "resultado": cot, "status": "ok",
+            "resposta_curta": formatar_cotacao(cot)}
+
+
 def _executar_leitura(plano: dict, pedido: str) -> dict:
     from ..browser.allowed import extrair_urls_de
     from ..browser.reader import PedidoLeitura, ler_pagina_autorizada, ErroLeitura
@@ -125,7 +141,12 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
 
     # e. executar conforme categoria
     resultado, status, erro = {"ok": False}, "falha", ""
-    if plano.get("ferramentas") and "browser/reader" in plano["ferramentas"]:
+    if classificacao.categoria == "cotacao":
+        resp = _executar_cotacao()
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
+    elif plano.get("ferramentas") and "browser/reader" in plano["ferramentas"]:
         resp = _executar_leitura(plano, pedido)
         status = resp.get("status", "ok" if resp["ok"] else "falha")
         erro = resp.get("erro", "")
@@ -141,6 +162,7 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
     rel = montar_relatorio(
         objetivo=pedido, classificacao=classificacao.categoria, plano=plano,
         resultado=resultado_final, erro=erro, status=status, testes=testes,
+        resposta_curta=resultado.get("resposta_curta", "") if isinstance(resultado, dict) else "",
         proxima_acao="concluído" if status == "ok" else "revisar erro no journal")
     handoff = montar_handoff(
         objetivo_atual=pedido, etapa="executado" if status == "ok" else "falhou",

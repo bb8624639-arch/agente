@@ -20,6 +20,8 @@ class Classificacao(NamedTuple):
 
 _REGISTROS = [
     # (regex, categoria, acao, confianca)
+    (r"\b(cota[çc][ãa]o|c[aâ]mbio|d[oó]lar|dolar|usd|brl|euro|moeda|convers[ãa]o de moeda)\b",
+     "cotacao", "ler", 0.95),
     (r"\b(pre[çc]o|valor|cota[çc][ãa]o|consulta[rv]|buscar|pesquisa[rv]|coletar|extrair)\b",
      "pesquisa", "ler", 0.8),
     (r"\b(navegador|browser|site|p[aá]gina|scrap(a|e|ing)|raspagem|url|html)\b",

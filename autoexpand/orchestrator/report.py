@@ -27,7 +27,8 @@ def montar_relatorio(*, objetivo: str, classificacao: str, plano: dict | None = 
                      resultado: Any = None, erro: str = "", status: str = "ok",
                      aprovacoes_pendentes: list | None = None,
                      testes: list | None = None,
-                     proxima_acao: str = "", agentes: list | None = None) -> dict:
+                     proxima_acao: str = "", agentes: list | None = None,
+                     resposta_curta: str = "") -> dict:
     """Devolve relatório no formato de 11 campos exigido pelo usuário."""
     consumo = journal.resumo_consumo()
     aprov_pend = aprovacoes_pendentes if aprovacoes_pendentes is not None else []
@@ -35,6 +36,7 @@ def montar_relatorio(*, objetivo: str, classificacao: str, plano: dict | None = 
     return {
         "formato": "relatorio_11_campos",
         "modo": MODO_PADRAO,
+        "0_resposta_curta": resposta_curta,
         "1_objetivo_entendido": objetivo,
         "2_plano_de_etapas": (plano or {}).get("etapas", []),
         "3_agentes_envolvidos": agentes or ["orquestrador"],

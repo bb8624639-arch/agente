@@ -47,7 +47,13 @@ def _enviar(chat_id, texto: str) -> None:
         return
     payload = {"chat_id": chat_id, "text": texto[:4000], "parse_mode": "Markdown"}
     try:
-        requests.post(_url("sendMessage"), json=payload, timeout=15)
+        resp = requests.post(_url("sendMessage"), json=payload, timeout=15)
+        if resp.status_code != 200:
+            # fallback: sem parse_mode (emoji/underscore podem quebrar Markdown)
+            payload.pop("parse_mode", None)
+            resp = requests.post(_url("sendMessage"), json=payload, timeout=15)
+            if resp.status_code != 200:
+                journal.registrar_diario("erro", f"telegram enviar falhou: {resp.status_code} {resp.text[:200]}")
     except requests.RequestException as exc:
         journal.registrar_diario("erro", f"telegram enviar falhou: {exc}")
 
@@ -121,9 +127,13 @@ def _handle(corpo: dict) -> None:
         return
 
     resposta = executar_pedido(texto)
-    _enviar(chat_id, _resumo_relatorio(resposta["relatorio"]))
+    resposta_curta = resposta["relatorio"].get("0_resposta_curta", "")
+    if resposta_curta:
+        _enviar(chat_id, resposta_curta)
+    else:
+        _enviar(chat_id, _resumo_relatorio(resposta["relatorio"]))
     if resposta.get("handoff"):
-        _enviar(chat_id, f"Handoff: {resposta['handoff']}")
+        _enviar(chat_id, f"Transferência: {resposta['handoff']}")
 
 
 def rodar_polling(intervalo_s: float = 2.0) -> None:

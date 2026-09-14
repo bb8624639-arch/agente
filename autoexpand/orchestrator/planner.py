@@ -68,7 +68,21 @@ def _etapas_erro() -> list[dict]:
     ]
 
 
+def _etapas_cotacao() -> list[dict]:
+    return [
+        {"ordem": 1, "nome": "consultar PTAX do Banco Central (USD/BRL)", "ferramenta": "connectors/exchange",
+         "permissao": "ler_api", "deterministico": True},
+        {"ordem": 2, "nome": "formatar cotação (compra/venda)", "ferramenta": "connectors/exchange",
+         "permissao": "", "deterministico": True},
+    ]
+
+
 def _plano_para(categoria: str, acao: str) -> dict:
+    if categoria == "cotacao":
+        return {"categoria": categoria, "etapas": _etapas_cotacao(),
+                "ferramentas": ["connectors/exchange"], "permisoes": ["ler_api"],
+                "riscos": ["fonte externa indisponível", "dado não é contrato"],
+                "aprovacao_necessaria": False, "acao": acao}
     if categoria in ("pesquisa", "navegador"):
         return {"categoria": categoria, "etapas": _etapas_leitura(),
                 "ferramentas": ["browser/reader"], "permisoes": ["rede", "ler_api"],
