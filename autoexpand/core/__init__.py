@@ -1,0 +1,1 @@
+"""Núcleo do sistema de autoexpansão controlada."""
