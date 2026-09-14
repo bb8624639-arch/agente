@@ -92,6 +92,18 @@ python3 -m autoexpand.maintenance --ciclo
 ```
 Verifica saúde, roda testes, analisa logs, propõe correções (não auto-aplica as de risco).
 
+### Menu rápido (botões) no Telegram
+Envie `/menu` (ou `/start`) para abrir o teclado com botões para as funções
+essenciais:
+
+- 📚 **Aprender da internet** — você envia o tópico e o agente pesquisa.
+- 🧠 **Ensinar (treinar)** — você ensina `tópico: conteúdo`.
+- ⚡ **Criar módulo/script** — você descreve e o agente gera + testa + pede
+  aprovação.
+- 📦 **Meus módulos** / 🗂 **Conhecimentos** / ✅ **Aprovações** — consultas.
+- 💵 **Cotação do dólar** — consulta PTAX/BCB na hora.
+- 🆘 **Ajuda** / 🔁 **Recomeçar** — auxílio e volta ao menu.
+
 ### Treinamento e autoexpansão supervisionada (Telegram)
 O agente aprende e se expande **somente com sua supervisão**. Todos os comandos
 enviados pelo Telegram:

@@ -1,11 +1,11 @@
-"""Bot Telegram opcional (MVP).
+"""Bot Telegram (MVP).
 
 Requisitos:
 - token via env `TELEGRAM_BOT_TOKEN`;
 - chat autorizado via env `TELEGRAM_CHAT_ID` (ou config) — só ele pode usar;
 - recebe pedido → executa pipeline → devolve relatório resumido (11 campos);
-- botões reais exigiram webhook/InlineKeyboard; aqui usamos comandos de texto
-  (`/aprovar <id>`, `/recusar <id>`, `/status`, `/emergencia`).
+- menu com botões (InlineKeyboard) para auto-expansão + comandos de texto
+  (`/aprovado <id>`, `/recusar <id>`, `/status`, `/emergencia`, `/menu`).
 
 Sem token: o módulo importa e nada faz (safe).
 """
@@ -23,6 +23,10 @@ from ..config import carregar_config, salvar_config
 from ..core import approvals, budget, journal
 from ..core import knowledge as conhecimento
 from ..orchestrator.executor import executar_pedido
+
+# Estado em memória p/ fluxo "aguardando entrada" (tópico do /aprender etc.).
+# chave: chat_id; valor: "aprender" | "treinar" | "criar_modulo" | None
+_AGUARDANDO: dict = {}
 
 # Carrega .env (raiz do projeto) se existir — credenciais nunca versionadas.
 _ENV = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -43,6 +47,28 @@ def _url(método: str) -> str:
     return f"{BASE}/{método}"
 
 
+def _botao(texto: str, dado: str) -> dict:
+    return {"text": texto, "callback_data": dado}
+
+
+def _botao_url(texto: str, url: str) -> dict:
+    return {"text": texto, "url": url}
+
+
+def _teclado_menu() -> list[list[dict]]:
+    return [
+        [_botao("📚 Aprender da internet", "menu_aprender"),
+         _botao("🧠 Ensinar (treinar)", "menu_treinar")],
+        [_botao("⚡ Criar módulo/script", "menu_modulo"),
+         _botao("📦 Meus módulos", "menu_modulos")],
+        [_botao("🗂 Conhecimentos", "menu_conhecimento"),
+         _botao("✅ Aprovações", "menu_status")],
+        [_botao("💵 Cotação do dólar", "menu_cotacao"),
+         _botao("🆘 Ajuda", "menu_ajuda")],
+        [_botao("🔁 Recomeçar", "menu_inicio")],
+    ]
+
+
 def _enviar(chat_id, texto: str) -> None:
     if not TOKEN:
         return
@@ -57,6 +83,29 @@ def _enviar(chat_id, texto: str) -> None:
                 journal.registrar_diario("erro", f"telegram enviar falhou: {resp.status_code} {resp.text[:200]}")
     except requests.RequestException as exc:
         journal.registrar_diario("erro", f"telegram enviar falhou: {exc}")
+
+
+def _enviar_menu(chat_id) -> None:
+    _enviar_teclado(chat_id,
+                    "🤖 *Agente Orquestrador* — Auto-expansão com supervisão\n\n"
+                    "Escolha uma ação no menu:",
+                    _teclado_menu())
+
+
+def _enviar_teclado(chat_id, texto: str, teclado) -> None:
+    if not TOKEN:
+        return
+    payload = {"chat_id": chat_id, "text": texto[:4000],
+               "parse_mode": "Markdown", "reply_markup": {"inline_keyboard": teclado}}
+    try:
+        resp = requests.post(_url("sendMessage"), json=payload, timeout=15)
+        if resp.status_code != 200:
+            payload.pop("parse_mode", None)
+            resp = requests.post(_url("sendMessage"), json=payload, timeout=15)
+            if resp.status_code != 200:
+                journal.registrar_diario("erro", f"telegram teclado falhou: {resp.status_code} {resp.text[:200]}")
+    except requests.RequestException as exc:
+        journal.registrar_diario("erro", f"telegram teclado falhou: {exc}")
 
 
 def _resumo_relatorio(rel: dict) -> str:
@@ -89,6 +138,11 @@ def _autoriza_chat(chat_id: str) -> bool:
 
 
 def _handle(corpo: dict) -> None:
+    # Clique em botão do menu (callback_query)
+    if corpo.get("callback_query"):
+        _handle_callback(corpo)
+        return
+
     mensagem = (corpo.get("message") or {}).get("text", "")
     chat = (corpo.get("message") or {}).get("chat", {})
     chat_id = chat.get("id")
@@ -118,15 +172,7 @@ def _handle(corpo: dict) -> None:
                 resultado = conhecimento.decidir(int(restante), False, por="telegram")
                 _enviar(chat_id, f"Conhecimento #{restante}: {resultado['status']}" if resultado.get("status") != "inexistente" else "id inexistente")
         elif comando == "conhecimento":
-            lista = conhecimento.listar("rascunho") + conhecimento.listar("aprovado")
-            if not lista:
-                _enviar(chat_id, "Nenhum conhecimento cadastrado.")
-            else:
-                linhas = []
-                for k in lista[:10]:
-                    estado = "✅" if k["status"] == "aprovado" else ("⏳" if k["status"] == "rascunho" else "❌")
-                    linhas.append(f"{estado} #{k['id']} {k['topico']} ({k['status']})")
-                _enviar(chat_id, "Conhecimentos:\n" + "\n".join(linhas))
+            _listar_conhecimentos(chat_id)
         elif comando == "treinar":
             if not restante or ":" not in restante:
                 _enviar(chat_id, "Uso: /treinar tópico: conteúdo")
@@ -160,39 +206,170 @@ def _handle(corpo: dict) -> None:
             curt = resposta_nova["relatorio"].get("0_resposta_curta", "")
             _enviar(chat_id, curt or resposta_nova["relatorio"]["11_relatorio_de_execucao"]["status"])
         elif comando == "modulos" or comando == "listar_modulos":
-            from ..core import persistence
-            linhas = persistence.consultar(
-                "SELECT nome, versao, perfil, aprovado FROM modulos "
-                "WHERE status='ativo' ORDER BY nome, versao", ())
-            if not linhas:
-                _enviar(chat_id, "Nenhum módulo publicado ainda.")
-            else:
-                texto_mod = "Módulos:\n" + "\n".join(
-                    f"`{l['nome']}` v{l['versao']} ({l['perfil']}{'✅' if l['aprovado'] else '⏳'})"
-                    for l in linhas[-15:])
-                _enviar(chat_id, texto_mod)
+            _listar_modulos(chat_id)
+        elif comando == "menu" or comando == "inicio":
+            _enviar_menu(chat_id)
+        elif comando == "start" or comando == "help":
+            _enviar_menu(chat_id)
         elif comando == "status":
-            pend = approvals.pendentes()
-            if pend:
-                _enviar(chat_id, "Pendentes:\n" + "\n".join(
-                    f"`{p['id']}` {p['acao']}" for p in pend))
-            else:
-                _enviar(chat_id, "Nenhuma aprovação pendente.")
-            pend_conh = conhecimento.listar("rascunho")
-            if pend_conh:
-                _enviar(chat_id, "Conhecimentos aguardando:\n" + "\n".join(
-                    f"#{k['id']} {k['topico']} (/aprovar_conh {k['id']})" for k in pend_conh[:5]))
+            _status(chat_id)
         elif comando == "emergencia":
             cfg = carregar_config()
             cfg.emergencia = True
             salvar_config(cfg)
             _enviar(chat_id, "🔴 Emergência acionada. Execuções pausadas.")
-        elif comando == "start" or comando == "help":
-            _enviar(chat_id, "Envie um pedido ou use /aprovado <id>, /recusar <id>, /status, /emergencia.")
         else:
             _enviar(chat_id, f"Comando desconhecido: /{comando}")
         return
 
+    # Texto livre: fluxo de aguardando do menu ou execução direta
+    _processar_texto(chat_id, texto)
+
+
+def _resolver_callback(chat_id, dado: str) -> bool:
+    """Processa os cliques do InlineKeyboard. Devolve True se identificado."""
+    if not dado.startswith("menu_"):
+        return False
+    _, acao = dado.split("_", 1)
+
+    if acao == "inicio" or acao == "ajuda":
+        _enviar_menu(chat_id)
+        if acao == "ajuda":
+            _enviar(chat_id,
+                    "🧠 *Como usar o menu:*\n\n"
+                    "• *Aprender da internet* — pesquiso um tópico (Wikipedia) "
+                    "e crio um rascunho para você aprovar.\n"
+                    "• *Ensinar (treinar)* — você me ensina algo diretamente "
+                    "(`tópico: conteúdo`).\n"
+                    "• *Criar módulo/script* — gero um script, testo no sandbox "
+                    "e peço sua aprovação para publicar.\n"
+                    "• *Meus módulos* — lista módulos registrados.\n"
+                    "• *Conhecimentos* — lista o que aprendi (aprovados/rascunhos).\n"
+                    "• *Aprovações* — mostra aprovações pendentes (módulos e outras).")
+        return True
+    if acao == "aprender":
+        _AGUARDANDO[str(chat_id)] = "aprender"
+        _enviar(chat_id,
+                "📚 *Aprender da internet*\n\n"
+                "Envie o tópico que você quer que eu aprenda.\n"
+                "_Ex.: automação comercial, marketing digital, inteligência artificial_")
+        return True
+    if acao == "treinar":
+        _AGUARDANDO[str(chat_id)] = "treinar"
+        _enviar(chat_id,
+                "🧠 *Ensinar (treinar)*\n\n"
+                "Envie no formato `tópico: conteúdo`.\n"
+                "_Ex.: preferências do cliente: nosso maior cliente prefere "
+                "WhatsApp pela manhã_")
+        return True
+    if acao == "modulo":
+        _AGUARDANDO[str(chat_id)] = "criar_modulo"
+        _enviar(chat_id,
+                "⚡ *Criar módulo/script*\n\n"
+                "Descreva o que o script deve fazer.\n"
+                "_Ex.: script que valida CPF, script que calcula IMC, "
+                "script que dobra um número_")
+        return True
+    if acao == "modulos":
+        _listar_modulos(chat_id)
+        return True
+    if acao == "conhecimento":
+        _listar_conhecimentos(chat_id)
+        return True
+    if acao == "status":
+        _status(chat_id)
+        return True
+    if acao == "cotacao":
+        _enviar(chat_id, "🔎 Consultando PTAX no Banco Central...")
+        resposta = executar_pedido("qual a cotação do dólar hoje?")
+        curt = resposta["relatorio"].get("0_resposta_curta", "")
+        _enviar(chat_id, curt or _resumo_relatorio(resposta["relatorio"]))
+        return True
+    return True
+
+
+def _listar_modulos(chat_id) -> None:
+    from ..core import persistence
+    linhas = persistence.consultar(
+        "SELECT nome, versao, perfil, aprovado FROM modulos "
+        "WHERE status='ativo' ORDER BY nome, versao", ())
+    if not linhas:
+        _enviar(chat_id, "📦 Nenhum módulo ainda. Use *Criar módulo/script* no menu para gerar o primeiro.")
+        return
+    texto_mod = "*Meus módulos:*\n" + "\n".join(
+        f"`{l['nome']}` v{l['versao']} ({l['perfil']} {'✅' if l['aprovado'] else '⏳'})"
+        for l in linhas[-15:])
+    _enviar(chat_id, texto_mod)
+
+
+def _listar_conhecimentos(chat_id) -> None:
+    lista = conhecimento.listar("rascunho") + conhecimento.listar("aprovado")
+    if not lista:
+        _enviar(chat_id, "🗂 Nenhum conhecimento ainda. Use *Aprender da internet* ou *Ensinar* no menu.")
+        return
+    linhas = []
+    for k in lista[:10]:
+        estado = "✅" if k["status"] == "aprovado" else ("⏳" if k["status"] == "rascunho" else "❌")
+        linhas.append(f"{estado} #{k['id']} {k['topico']} ({k['status']})")
+    _enviar(chat_id, "*Conhecimentos:*\n" + "\n".join(linhas))
+
+
+def _status(chat_id) -> None:
+    linhas_status = []
+    pend = approvals.pendentes()
+    if pend:
+        linhas_status.append("*Aprovações pendentes:*")
+        for p in pend[:8]:
+            linhas_status.append(f"`{p['id']}` {p['acao']} ({p['modulo']})")
+        linhas_status.append("→ Aprove com /aprovado <id> ou /recusar <id>")
+    else:
+        linhas_status.append("✅ *Nenhuma aprovação pendente.*")
+    pend_conh = conhecimento.listar("rascunho")
+    if pend_conh:
+        linhas_status.append("")
+        linhas_status.append("*Conhecimentos aguardando você:*")
+        for k in pend_conh[:5]:
+            linhas_status.append(f"#{k['id']} {k['topico']} (/aprovar_conh {k['id']})")
+    _enviar(chat_id, "\n".join(linhas_status))
+
+
+def _processar_texto(chat_id, texto: str) -> None:
+    """Fluxo de texto livre: se aguardando entrada do menu, trata; senão executar."""
+    espera = _AGUARDANDO.pop(str(chat_id), None)
+    if not espera:
+        _executar_pedido_chat(chat_id, texto)
+        return
+    if espera == "aprender":
+        _enviar(chat_id, f"🔎 Pesquisando '{texto}' na internet...")
+        resultado = conhecimento.aprender_e_registrar(texto)
+        if "erro" in resultado:
+            _enviar(chat_id, f"❌ {resultado['erro']}")
+        else:
+            _enviar(chat_id,
+                    f"📚 *Aprendizado # {resultado['id']}*\n"
+                    f"*Tópico:* {resultado['topico']}\n"
+                    f"*Fonte:* {resultado['fonte']}\n"
+                    f"*Resumo:* {resultado['conteudo']}\n\n"
+                    f"{resultado['aviso']}\n\n"
+                    f"Para aprovar: `/aprovar_conh {resultado['id']}`")
+    elif espera == "treinar":
+        if ":" not in texto:
+            _enviar(chat_id, "Formato: `tópico: conteúdo`. Ex.: `preferências: cliente gosta de e-mail`")
+            _AGUARDANDO[str(chat_id)] = "treinar"
+            return
+        topico, _, conteudo = texto.partition(":")
+        try:
+            id_c = conhecimento.registrar(topico, conteudo, origem="usuario")
+            _enviar(chat_id, f"✅ Ensinado! Conhecimento #{id_c} aprovado (origem: você).")
+        except ValueError as exc:
+            _enviar(chat_id, f"Erro: {exc}")
+    elif espera == "criar_modulo":
+        resposta_nova = executar_pedido(f"crie um {texto}")
+        curt = resposta_nova["relatorio"].get("0_resposta_curta", "")
+        _enviar(chat_id, curt or _resumo_relatorio(resposta_nova["relatorio"]))
+
+
+def _executar_pedido_chat(chat_id, texto: str) -> None:
     resposta = executar_pedido(texto)
     resposta_curta = resposta["relatorio"].get("0_resposta_curta", "")
     if resposta_curta:
@@ -201,6 +378,24 @@ def _handle(corpo: dict) -> None:
         _enviar(chat_id, _resumo_relatorio(resposta["relatorio"]))
     if resposta.get("handoff"):
         _enviar(chat_id, f"Transferência: {resposta['handoff']}")
+
+
+def _handle_callback(corpo: dict) -> None:
+    """Processa cliques em botões do InlineKeyboard."""
+    callback = corpo.get("callback_query") or {}
+    mensagem = callback.get("message") or {}
+    chat_id = (mensagem.get("chat") or {}).get("id")
+    dado = callback.get("data", "")
+    if chat_id is None or not _autoriza_chat(chat_id):
+        return
+    _resolver_callback(chat_id, dado)
+    # responde ao callback para sumir o "carregando..."
+    if callback.get("id") and TOKEN:
+        try:
+            requests.post(_url("answerCallbackQuery"),
+                          json={"callback_query_id": callback["id"]}, timeout=10)
+        except requests.RequestException:
+            pass
 
 
 def rodar_polling(intervalo_s: float = 2.0) -> None:
