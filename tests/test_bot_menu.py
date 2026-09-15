@@ -58,6 +58,10 @@ def test_menu_tem_botoes():
     assert "menu_pesquisar" in dados
     assert "menu_pensar" in dados
     assert "menu_contexto" in dados
+    # modo conversa
+    assert "menu_conversa" in dados
+    assert "menu_portais" in dados
+    assert "menu_ideologia" in dados
 
 
 def test_teclado_fixo_tem_start():
