@@ -67,6 +67,9 @@ def test_menu_tem_botoes():
     # restart e push (operações remotas)
     assert "menu_restart" in dados
     assert "menu_push" in dados
+    # configuração de API LLM
+    assert "menu_set_api" in dados
+    assert "menu_test_api" in dados
 
 
 def test_teclado_fixo_tem_start():
@@ -159,4 +162,47 @@ def test_botao_fixo_push_github(monkeypatch):
     _mock_requests(monkeypatch)
     tbot._AGUARDANDO.clear()
     assert tbot._mapear_botao_fixo(CHAT, "📤 Push GitHub") is True
+    tbot._AGUARDANDO.clear()
+
+
+def test_callback_set_api_inicia_fluxo(monkeypatch):
+    """menu_set_api coloca o bot em espera set_api e pergunta a chave."""
+    _mock_requests(monkeypatch)
+    tbot._AGUARDANDO.clear()
+    _handle_cb("menu_set_api", mid=5)
+    assert tbot._AGUARDANDO.get(str(CHAT)) == "set_api"
+    tbot._AGUARDANDO.clear()
+
+
+def test_set_api_salva_e_configura(monkeypatch, tmp_path):
+    """Receber a chave configura Gemini, salva no .env e testa conexão."""
+    _mock_requests(monkeypatch)
+    from autoexpand.economy import llm
+    monkeypatch.setattr(tbot, "_env_arquivo", lambda: tmp_path / ".env")
+    chamadas = []
+
+    def fake_testar():
+        chamadas.append("testar")
+        return (True, "conectado via gemini-2.0-flash")
+
+    monkeypatch.setattr(llm, "testar_conexao", fake_testar)
+    monkeypatch.setattr(llm, "reconfigurar",
+                        lambda **kw: setattr(llm, "TEM_LLM", True) or True)
+    tbot._AGUARDANDO.clear()
+    _handle_cb("menu_set_api", mid=6)
+    tbot._handle({"message": {"chat": {"id": CHAT}, "text": "chave_secreta_gemini_123"}})
+    assert tbot._AGUARDANDO.get(str(CHAT)) is None
+    assert tmp_path.joinpath(".env").exists()
+    conteudo = tmp_path.joinpath(".env").read_text(encoding="utf-8")
+    assert "AE_LLM_API_KEY=chave_secreta_gemini_123" in conteudo
+    assert "AE_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai" in conteudo
+    assert chamadas, "deveria testar a conexão"
+
+
+def test_test_api_responde(monkeypatch):
+    """menu_test_api responde com resultado do teste."""
+    _mock_requests(monkeypatch)
+    from autoexpand.economy import llm
+    monkeypatch.setattr(llm, "testar_conexao", lambda: (False, "sem API configurada"))
+    _handle_cb("menu_test_api", mid=7)
     tbot._AGUARDANDO.clear()

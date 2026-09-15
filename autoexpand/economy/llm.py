@@ -101,6 +101,46 @@ def _registrar_consumo(llamada: ChamadaLLM, motivo: str) -> None:
                               "custo_r": round(custo, 4)})
 
 
+def reconfigurar(*, base_url: str | None = None, api_key: str | None = None,
+                 modelo_barato: str | None = None, modelo_avancado: str | None = None) -> bool:
+    """Atualiza a configuração do LLM em runtime (sem reiniciar o bot).
+
+    Usada pelo comando `/set_api` do Telegram. Passar None mantém o atual;
+    passe string vazia para limpar (desabilita o LLM).
+    """
+    global BASE_URL, API_KEY, MODELO_BARATO, MODELO_AVANCADO, TEM_LLM
+    if base_url is not None:
+        BASE_URL = base_url
+        os.environ["AE_LLM_BASE_URL"] = base_url
+    if api_key is not None:
+        API_KEY = api_key
+        os.environ["AE_LLM_API_KEY"] = api_key
+    if modelo_barato is not None:
+        MODELO_BARATO = modelo_barato
+        os.environ["AE_LLM_MODEL_BARATO"] = modelo_barato
+    if modelo_avancado is not None:
+        MODELO_AVANCADO = modelo_avancado
+        os.environ["AE_LLM_MODEL_AVANCADO"] = modelo_avancado
+    TEM_LLM = bool(BASE_URL and API_KEY)
+    return TEM_LLM
+
+
+def testar_conexao() -> tuple[bool, str]:
+    """Faz uma chamada mínima para verificar se a API está acessível.
+
+    Retorna (ok, detalhe). Sem config, retorna (False, "sem LLM configurado").
+    """
+    if not TEM_LLM:
+        return False, "nenhuma API LLM configurada (use /set_api)"
+    try:
+        r = barato("Responda apenas: ok", "teste de conexão", max_saida=20)
+        if r.strip():
+            return True, f"conectado via {MODELO_BARATO}"
+        return False, "API respondeu vazio — verifique a chave/modelo"
+    except Exception as exc:
+        return False, f"erro de conexão: {str(exc)[:200]}"
+
+
 def barato(prompt: str, motivo: str, *, max_saida: int = 500) -> str:
     """Modelo econômico: classificação, extração, roteamento, decisões simples."""
     chamada = _chamar(prompt, MODELO_BARATO, motivo, temperatura=0.0, max_saida=max_saida)

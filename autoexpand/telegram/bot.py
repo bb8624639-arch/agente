@@ -81,6 +81,8 @@ def _teclado_menu() -> list[list[dict]]:
          _botao("💵 Cotação do dólar", "menu_cotacao")],
         [_botao("🔄 Reiniciar bot", "menu_restart"),
          _botao("📤 Enviar GitHub (push)", "menu_push")],
+        [_botao("🔑 Configurar IA (API)", "menu_set_api"),
+         _botao("🔌 Testar IA", "menu_test_api")],
         [_botao("🆘 Ajuda", "menu_ajuda"),
          _botao("🔁 Recomeçar", "menu_inicio")],
     ]
@@ -97,6 +99,7 @@ def _teclado_fixo() -> list[list[str]]:
         ["📦 Modulos", "🗂 Conhecimento", "✅ Aprovações"],
         ["💵 Cotação", "🔄 Evoluir", "🆘 Ajuda"],
         ["🔄 Reiniciar", "📤 Push GitHub", "🔁 Recomeçar"],
+        ["🔑 Configurar IA (API)", "🔌 Testar IA"],
     ]
 
 
@@ -128,7 +131,7 @@ def _texto_ajuda() -> str:
             "_Comandos diretos:_ /aprender · /aprender_auto · /estudar · /pesquisar · "
             "/treinar · /contexto · /pensar · /criar_modulo · /modulos · "
             "/conhecimento · /status · /conversa · /portais · /ideologia · "
-            "/autosave · /push · /reiniciar · /emergencia")
+            "/autosave · /push · /reiniciar · /set_api · /test_api · /emergencia")
 
 
 def _enviar(chat_id, texto: str) -> None:
@@ -391,6 +394,13 @@ def _handle(corpo: dict) -> None:
             _acao_restart(chat_id)
         elif comando in ("push", "push_github"):
             _acao_push(chat_id)
+        elif comando in ("set_api", "config_api", "configurar_ia", "setapi"):
+            if restante:
+                _set_api_chave(chat_id, restante)
+            else:
+                _acao_set_api(chat_id)
+        elif comando in ("test_api", "testar_ia", "testar_api", "testapi"):
+            _acao_test_api(chat_id)
         elif comando == "status":
             _status(chat_id)
         elif comando == "emergencia":
@@ -515,6 +525,12 @@ def _resolver_callback(chat_id, dado: str) -> bool:
     if acao in ("push", "push_github", "enviar_github"):
         _acao_push(chat_id)
         return True
+    if acao in ("set_api", "config_api", "configurar_ia"):
+        _acao_set_api(chat_id)
+        return True
+    if acao in ("test_api", "testar_ia"):
+        _acao_test_api(chat_id)
+        return True
     return True
 
 
@@ -579,6 +595,82 @@ def _acao_push(chat_id) -> None:
         _enviar(chat_id, ("✅ " if r.get("ok") else "❌ ") + r.get("detalhe", str(r)))
     except Exception as exc:
         _enviar(chat_id, f"❌ Push falhou: {exc}")
+
+
+# ---- Configuração de API LLM (Gemini/OpenAI) via Telegram ----
+def _env_arquivo() -> Path:
+    """Caminho do .env do projeto (o mesmo lido pelo bot na inicialização)."""
+    return Path(__file__).resolve().parent.parent.parent / ".env"
+
+
+def _salvar_env_chave(chave: str, valor: str) -> None:
+    """Atualiza/substitui uma variável no .env sem expor em logs nem versionar."""
+    caminho = _env_arquivo()
+    linhas = caminho.read_text(encoding="utf-8").splitlines() if caminho.exists() else []
+    achou = False
+    novas = []
+    for l in linhas:
+        if l.strip().startswith(chave + "="):
+            novas.append(f"{chave}={valor}")
+            achou = True
+        else:
+            novas.append(l)
+    if not achou:
+        novas.append(f"{chave}={valor}")
+    caminho.write_text("\n".join(novas) + "\n", encoding="utf-8")
+    os.environ[chave] = valor
+
+
+def _acao_set_api(chat_id) -> None:
+    """Inicia o fluxo para configurar a chave da API LLM via Telegram."""
+    from ..economy import llm as llm_mod
+    _AGUARDANDO[str(chat_id)] = "set_api"
+    estado = ("✅ já configurada" if llm_mod.TEM_LLM else "❌ não configurada")
+    _enviar(chat_id,
+            "🔑 *Configurar IA (API)*\n\n"
+            f"Status atual: {estado}\n"
+            "Envie a *chave de API* (ex.: chave do Google AI Studio/Gemini).\n\n"
+            "_A chave fica apenas no `.env` local — nunca é enviada ao GitHub._")
+
+
+def _acao_test_api(chat_id) -> None:
+    """Testa a conexão com a API LLM configurada."""
+    from ..economy import llm as llm_mod
+    _enviar(chat_id, "🔌 Testando conexão com a API de IA...")
+    try:
+        ok, detalhe = llm_mod.testar_conexao()
+        _enviar(chat_id, ("✅ " if ok else "❌ ") + detalhe)
+    except Exception as exc:
+        _enviar(chat_id, f"❌ Teste falhou: {str(exc)[:200]}")
+
+
+def _set_api_chave(chat_id, texto: str) -> None:
+    """Recebe a chave, configura Gemini (base_url OpenAI-compatível) e testa."""
+    from ..economy import llm as llm_mod
+    chave = texto.strip()
+    if not chave or len(chave) < 5:
+        _enviar(chat_id, "❌ Chave inválida. Envie a chave de API novamente.")
+        _AGUARDANDO[str(chat_id)] = "set_api"
+        return
+    try:
+        base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+        _salvar_env_chave("AE_LLM_BASE_URL", base_url)
+        _salvar_env_chave("AE_LLM_API_KEY", chave)
+        _salvar_env_chave("AE_LLM_MODEL_BARATO", "gemini-2.0-flash")
+        _salvar_env_chave("AE_LLM_MODEL_AVANCADO", "gemini-2.0-flash")
+        llm_mod.reconfigurar(base_url=base_url, api_key=chave,
+                             modelo_barato="gemini-2.0-flash",
+                             modelo_avancado="gemini-2.0-flash")
+        _AGUARDANDO.pop(str(chat_id), None)
+        _enviar(chat_id, "🔑 API de IA configurada (Gemini). Verificando conexão...")
+        ok, detalhe = llm_mod.testar_conexao()
+        _enviar(chat_id, ("✅ " if ok else "❌ ") + detalhe)
+        if ok:
+            _enviar(chat_id, "🧠 *IA ativa!* Agora posso classificar, planejar e " 
+                             "expandir com apoio do Gemini. Use /evoluir ou *Aprender sozinho*.")
+        _autosave("chave de API LLM configurada via Telegram")
+    except Exception as exc:
+        _enviar(chat_id, f"❌ Erro ao configurar: {str(exc)[:200]}")
 
 
 def _autosave(motivo: str) -> None:
@@ -723,6 +815,8 @@ def _processar_texto(chat_id, texto: str) -> None:
     elif espera == "contexto":
         r = _importar_contexto(texto)
         _enviar(chat_id, r["resposta_curta"] if r.get("resposta_curta") else str(r))
+    elif espera == "set_api":
+        _set_api_chave(chat_id, texto)
 
 
 def _importar_contexto(texto: str) -> dict:
@@ -772,6 +866,9 @@ def _mapear_botao_fixo(chat_id, texto: str) -> bool:
         "reiniciar bot": "restart", "🔄 reiniciar bot": "restart",
         "📤 push github": "push", "push github": "push", "push": "push",
         "📤 push": "push",
+        "🔑 configurar ia (api)": "set_api", "configurar ia": "set_api",
+        "configurar api": "set_api", "set api": "set_api", "api": "set_api",
+        "🔌 testar ia": "test_api", "testar ia": "test_api", "testar api": "test_api",
         "🆘 ajuda": "ajuda", "ajuda": "ajuda",
     }
     acao = mapa.get(texto_norm)
@@ -888,6 +985,8 @@ def _registrar_comandos() -> None:
         {"command": "cotacao", "description": "Cotação do dólar (PTAX)"},
         {"command": "push", "description": "Enviar aprendizado/mudanças para o GitHub"},
         {"command": "reiniciar", "description": "Reiniciar o bot (Termux/servidor)"},
+        {"command": "set_api", "description": "Configurar chave da API de IA (Gemini)"},
+        {"command": "test_api", "description": "Testar conexão com a API de IA"},
         {"command": "status", "description": "Ver aprovações e resumo"},
         {"command": "emergencia", "description": "Pausar tudo"},
     ]
