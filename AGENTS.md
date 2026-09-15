@@ -39,10 +39,12 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
   `/estudar` ou texto "trilha" (segue a próxima etapa da trilha infinita).
   Operação remota (Termux/servidor): `/push` (commit+push para o GitHub,
   mesmo fluxo do autosave) e `/reiniciar` (reinicia o bot via run_bot.sh restart).
-  API de IA: `/set_api <chave>` ou menu "Configurar IA (API)" — configura Gemini
-  (base_url `generativelanguage.googleapis.com/v1beta/openai`, modelo
-  gemini-2.0-flash) salvo no `.env` local (nunca versionado) e ativa o LLM em
-  runtime via `llm.reconfigurar()`; `/test_api` testa a conexão.
+  API de IA: `/set_api <provedor> <chave>` ou menu "Configurar IA (API)" — suporta
+  os provedores do catálogo `autoexpand/economy/llm.py::PROVEDORES`: gemini,
+  openai, openrouter, groq, deepseek, local (Ollama) e openhands (All Hands Cloud,
+  tipo próprio que usa a V1 API de conversas, não /chat/completions). Chave salva
+  no `.env` local (nunca versionado) e ativa o LLM em runtime via
+  `llm.reconfigurar()`; `/test_api` testa a conexão.
   Trilhas: `autoexpand/core/aprendizado_auto.py` (linguagens→web→mobile→ferramentas,
   ordem fixa, posição persistida em `config.aprendizado_idx`; `ciclo_aprendizado(limite, avancar=)`).
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.

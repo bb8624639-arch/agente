@@ -166,16 +166,16 @@ def test_botao_fixo_push_github(monkeypatch):
 
 
 def test_callback_set_api_inicia_fluxo(monkeypatch):
-    """menu_set_api coloca o bot em espera set_api e pergunta a chave."""
+    """menu_set_api coloca o bot em espera pela escolha do provedor."""
     _mock_requests(monkeypatch)
     tbot._AGUARDANDO.clear()
     _handle_cb("menu_set_api", mid=5)
-    assert tbot._AGUARDANDO.get(str(CHAT)) == "set_api"
+    assert tbot._AGUARDANDO.get(str(CHAT)) == "set_api_provedor"
     tbot._AGUARDANDO.clear()
 
 
-def test_set_api_salva_e_configura(monkeypatch, tmp_path):
-    """Receber a chave configura Gemini, salva no .env e testa conexão."""
+def test_set_api_gemini_fluxo_2_passos(monkeypatch, tmp_path):
+    """Escolher gemini e enviar a chave configura e testa a conexão."""
     _mock_requests(monkeypatch)
     from autoexpand.economy import llm
     monkeypatch.setattr(tbot, "_env_arquivo", lambda: tmp_path / ".env")
@@ -186,17 +186,55 @@ def test_set_api_salva_e_configura(monkeypatch, tmp_path):
         return (True, "conectado via gemini-2.0-flash")
 
     monkeypatch.setattr(llm, "testar_conexao", fake_testar)
-    monkeypatch.setattr(llm, "reconfigurar",
-                        lambda **kw: setattr(llm, "TEM_LLM", True) or True)
     tbot._AGUARDANDO.clear()
     _handle_cb("menu_set_api", mid=6)
-    tbot._handle({"message": {"chat": {"id": CHAT}, "text": "chave_secreta_gemini_123"}})
+    # passa 1: escolhe o provedor
+    tbot._handle({"message": {"chat": {"id": CHAT}, "text": "gemini"}})
+    assert tbot._AGUARDANDO.get(str(CHAT)) == "set_api"
+    # passo 2: envia a chave
+    tbot._handle({"message": {"chat": {"id": CHAT},
+                              "text": "chave_secreta_gemini_123"}})
     assert tbot._AGUARDANDO.get(str(CHAT)) is None
     assert tmp_path.joinpath(".env").exists()
     conteudo = tmp_path.joinpath(".env").read_text(encoding="utf-8")
     assert "AE_LLM_API_KEY=chave_secreta_gemini_123" in conteudo
     assert "AE_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai" in conteudo
+    assert "AE_LLM_PROVIDER=gemini" in conteudo
     assert chamadas, "deveria testar a conexão"
+
+
+def test_set_api_direto_com_provedor(monkeypatch, tmp_path):
+    """/set_api openhands <chave> configura direto sem 2 passos."""
+    _mock_requests(monkeypatch)
+    from autoexpand.economy import llm
+    monkeypatch.setattr(tbot, "_env_arquivo", lambda: tmp_path / ".env")
+
+    def fake_testar():
+        return (True, "conectado")
+
+    def fake_reconfig(**kw):
+        llm.TEM_LLM = True
+        return True
+
+    monkeypatch.setattr(llm, "testar_conexao", fake_testar)
+    monkeypatch.setattr(llm, "reconfigurar", fake_reconfig)
+    tbot._AGUARDANDO.clear()
+    tbot._handle({"message": {"chat": {"id": CHAT},
+                              "text": "/set_api openhands chave_all_hands_xyz"}})
+    assert tbot._AGUARDANDO.get(str(CHAT)) is None
+    conteudo = tmp_path.joinpath(".env").read_text(encoding="utf-8")
+    assert "AE_LLM_API_KEY=chave_all_hands_xyz" in conteudo
+    assert "AE_LLM_PROVIDER=openhands" in conteudo
+
+
+def test_set_api_provedor_desconhecido(monkeypatch, tmp_path):
+    _mock_requests(monkeypatch)
+    tbot._AGUARDANDO.clear()
+    _handle_cb("menu_set_api", mid=8)
+    tbot._handle({"message": {"chat": {"id": CHAT}, "text": "nao_existe"}})
+    # continua esperando provedor válido
+    assert tbot._AGUARDANDO.get(str(CHAT)) == "set_api_provedor"
+    tbot._AGUARDANDO.clear()
 
 
 def test_test_api_responde(monkeypatch):

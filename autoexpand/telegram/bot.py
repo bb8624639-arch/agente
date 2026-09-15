@@ -131,7 +131,10 @@ def _texto_ajuda() -> str:
             "_Comandos diretos:_ /aprender · /aprender_auto · /estudar · /pesquisar · "
             "/treinar · /contexto · /pensar · /criar_modulo · /modulos · "
             "/conhecimento · /status · /conversa · /portais · /ideologia · "
-            "/autosave · /push · /reiniciar · /set_api · /test_api · /emergencia")
+            "/autosave · /push · /reiniciar · /set_api · /test_api · /emergencia\n\n"
+            "_Provedores de IA:_ /set_api aceita gemini, openai, openrouter, groq, "
+            "deepseek, local (Ollama) e openhands (All Hands Cloud) — "
+            "ex.: `/set_api openhands <chave>`")
 
 
 def _enviar(chat_id, texto: str) -> None:
@@ -396,7 +399,22 @@ def _handle(corpo: dict) -> None:
             _acao_push(chat_id)
         elif comando in ("set_api", "config_api", "configurar_ia", "setapi"):
             if restante:
-                _set_api_chave(chat_id, restante)
+                partes = restante.split(maxsplit=1)
+                from ..economy import llm as llm_mod
+                slug = llm_mod._normalizar_provedor(partes[0])
+                if slug not in llm_mod.PROVEDORES:
+                    lista = ", ".join(llm_mod.PROVEDORES.keys())
+                    _enviar(chat_id, f"❌ Provedor desconhecido. Use: /set_api <provedor> <chave> "
+                                     f"(disponíveis: {lista})")
+                elif len(partes) == 2:
+                    _AGUARDANDO[str(chat_id)] = "set_api"
+                    _AGUARDANDO[f"{chat_id}_prov"] = slug
+                    _set_api_chave(chat_id, partes[1])
+                else:
+                    _AGUARDANDO[str(chat_id)] = "set_api"
+                    _AGUARDANDO[f"{chat_id}_prov"] = slug
+                    _enviar(chat_id, f"🧩 {llm_mod.PROVEDORES[slug]['nome']}\n\n"
+                                     "Agora envie a *chave de API*:")
             else:
                 _acao_set_api(chat_id)
         elif comando in ("test_api", "testar_ia", "testar_api", "testapi"):
@@ -622,15 +640,22 @@ def _salvar_env_chave(chave: str, valor: str) -> None:
 
 
 def _acao_set_api(chat_id) -> None:
-    """Inicia o fluxo para configurar a chave da API LLM via Telegram."""
+    """Inicia o fluxo para configurar a chave da API LLM via Telegram.
+
+    Passo 1: escolher o provedor (texto). Passo 2: enviar a chave.
+    """
     from ..economy import llm as llm_mod
-    _AGUARDANDO[str(chat_id)] = "set_api"
+    _AGUARDANDO[str(chat_id)] = "set_api_provedor"
     estado = ("✅ já configurada" if llm_mod.TEM_LLM else "❌ não configurada")
+    lista = "\n".join(f"{slug}: {p['nome']}" for slug, p in llm_mod.PROVEDORES.items())
     _enviar(chat_id,
             "🔑 *Configurar IA (API)*\n\n"
             f"Status atual: {estado}\n"
-            "Envie a *chave de API* (ex.: chave do Google AI Studio/Gemini).\n\n"
-            "_A chave fica apenas no `.env` local — nunca é enviada ao GitHub._")
+            "Qual provedor de IA você quer usar?\n\n"
+            f"{lista}\n\n"
+            "_Digite o nome do provedor (ex.: gemini) ou use "
+            "`/set_api <provedor> <chave>` direto._\n"
+            "_A chave fica apenas no `.env` local — nunca vai ao GitHub._")
 
 
 def _acao_test_api(chat_id) -> None:
@@ -644,30 +669,51 @@ def _acao_test_api(chat_id) -> None:
         _enviar(chat_id, f"❌ Teste falhou: {str(exc)[:200]}")
 
 
-def _set_api_chave(chat_id, texto: str) -> None:
-    """Recebe a chave, configura Gemini (base_url OpenAI-compatível) e testa."""
+def _set_api_provedor(chat_id, texto: str) -> None:
+    """Recebe o provedor e prende em espera pela chave."""
     from ..economy import llm as llm_mod
+    slug = llm_mod._normalizar_provedor(texto)
+    prov = llm_mod.PROVEDORES.get(slug)
+    if not prov:
+        lista = ", ".join(llm_mod.PROVEDORES.keys())
+        _enviar(chat_id, f"❌ Provedor desconhecido. Disponíveis: {lista}. "
+                         "Digite apenas o nome do provedor.")
+        _AGUARDANDO[str(chat_id)] = "set_api_provedor"
+        return
+    _AGUARDANDO[str(chat_id)] = "set_api"
+    _AGUARDANDO[f"{chat_id}_prov"] = slug
+    _enviar(chat_id, f"🧩 *{prov['nome']}*\n\n"
+                     "Agora envie a *chave de API*:")
+
+
+def _set_api_chave(chat_id, texto: str) -> None:
+    """Recebe a chave, configura o provedor escolhido e testa a conexão."""
+    from ..economy import llm as llm_mod
+    slug = _AGUARDANDO.get(f"{chat_id}_prov", "gemini")
     chave = texto.strip()
     if not chave or len(chave) < 5:
         _enviar(chat_id, "❌ Chave inválida. Envie a chave de API novamente.")
         _AGUARDANDO[str(chat_id)] = "set_api"
         return
     try:
-        base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
-        _salvar_env_chave("AE_LLM_BASE_URL", base_url)
+        llm_mod.reconfigurar(provider=slug, api_key=chave)
+        _salvar_env_chave("AE_LLM_PROVIDER", slug)
         _salvar_env_chave("AE_LLM_API_KEY", chave)
-        _salvar_env_chave("AE_LLM_MODEL_BARATO", "gemini-2.0-flash")
-        _salvar_env_chave("AE_LLM_MODEL_AVANCADO", "gemini-2.0-flash")
-        llm_mod.reconfigurar(base_url=base_url, api_key=chave,
-                             modelo_barato="gemini-2.0-flash",
-                             modelo_avancado="gemini-2.0-flash")
+        _salvar_env_chave("AE_LLM_BASE_URL", llm_mod.BASE_URL)
+        if llm_mod.MODELO_BARATO:
+            _salvar_env_chave("AE_LLM_MODEL_BARATO", llm_mod.MODELO_BARATO)
+        if llm_mod.MODELO_AVANCADO:
+            _salvar_env_chave("AE_LLM_MODEL_AVANCADO", llm_mod.MODELO_AVANCADO)
         _AGUARDANDO.pop(str(chat_id), None)
-        _enviar(chat_id, "🔑 API de IA configurada (Gemini). Verificando conexão...")
+        _AGUARDANDO.pop(f"{chat_id}_prov", None)
+        nome = llm_mod.PROVEDORES.get(slug, {}).get("nome", slug)
+        _enviar(chat_id, f"🔑 API configurada: *{nome}*. Verificando conexão...")
         ok, detalhe = llm_mod.testar_conexao()
         _enviar(chat_id, ("✅ " if ok else "❌ ") + detalhe)
         if ok:
-            _enviar(chat_id, "🧠 *IA ativa!* Agora posso classificar, planejar e " 
-                             "expandir com apoio do Gemini. Use /evoluir ou *Aprender sozinho*.")
+            _enviar(chat_id, "🧠 *IA ativa!* Agora posso classificar, planejar e "
+                             "expandir com base no que aprendi. Use /evoluir ou "
+                             "*Aprender sozinho*.")
         _autosave("chave de API LLM configurada via Telegram")
     except Exception as exc:
         _enviar(chat_id, f"❌ Erro ao configurar: {str(exc)[:200]}")
@@ -815,6 +861,8 @@ def _processar_texto(chat_id, texto: str) -> None:
     elif espera == "contexto":
         r = _importar_contexto(texto)
         _enviar(chat_id, r["resposta_curta"] if r.get("resposta_curta") else str(r))
+    elif espera == "set_api_provedor":
+        _set_api_provedor(chat_id, texto)
     elif espera == "set_api":
         _set_api_chave(chat_id, texto)
 
