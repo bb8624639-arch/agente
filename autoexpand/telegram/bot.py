@@ -25,6 +25,7 @@ from ..core import approvals, budget, journal
 from ..core import knowledge as conhecimento
 from ..core import git_autosave
 from ..core import conversa
+from ..core import ciclo
 from ..orchestrator.executor import executar_pedido
 
 # Estado em memória p/ fluxo "aguardando entrada" (tópico do /aprender etc.).
@@ -72,9 +73,10 @@ def _teclado_menu() -> list[list[dict]]:
          _botao("✅ Aprovações", "menu_status")],
         [_botao("🤔 Pensar", "menu_pensar"),
          _botao("📥 Contexto colado", "menu_contexto")],
-        [_botao("💵 Cotação do dólar", "menu_cotacao"),
-         _botao("🆘 Ajuda", "menu_ajuda")],
-        [_botao("🔁 Recomeçar", "menu_inicio")],
+        [_botao("🔄 Evoluir", "menu_evoluir"),
+         _botao("💵 Cotação do dólar", "menu_cotacao")],
+        [_botao("🆘 Ajuda", "menu_ajuda"),
+         _botao("🔁 Recomeçar", "menu_inicio")],
     ]
 
 
@@ -86,7 +88,7 @@ def _teclado_fixo() -> list[list[str]]:
         ["📚 Aprender", "🧠 Treinar", "🌐 Pesquisar"],
         ["🤔 Pensar", "📥 Contexto", "⚡ Módulo"],
         ["📦 Modulos", "🗂 Conhecimento", "✅ Aprovações"],
-        ["💵 Cotação", "🆘 Ajuda"],
+        ["💵 Cotação", "🔄 Evoluir", "🆘 Ajuda"],
     ]
 
 
@@ -108,7 +110,9 @@ def _texto_ajuda() -> str:
             "• *Módulos* — lista módulos registrados.\n"
             "• *Conhecimento* — lista o que aprendi.\n"
             "• *Aprovações* — aprovações pendentes.\n"
-            "• *Autosave* — aprendizado/aprovações são salvos no GitHub automaticamente.\n\n"
+            "• *Autosave* — aprendizado/aprovações são salvos no GitHub automaticamente.\n"
+            "• *Evoluir* — /evoluir analisa meus registros e propõe o próximo "
+            "passo de aprendizado/desenvolvimento (aprendizado contínuo).\n\n"
             "_Comandos diretos:_ /aprender · /pesquisar · /treinar · /contexto · "
             "/pensar · /criar_modulo · /modulos · /conhecimento · /status · "
             "/conversa · /portais · /ideologia · /autosave · /emergencia")
@@ -321,6 +325,11 @@ def _handle(corpo: dict) -> None:
             _enviar(chat_id, conversa.portais(restante))
         elif comando == "ideologia":
             _enviar(chat_id, conversa.ideologia())
+        elif comando in ("evoluir", "ciclo", "evolucao"):
+            _enviar(chat_id, "🔄 Analisando o estado do agente e meus registros...")
+            diagnostico = ciclo.diagnosticar()
+            _enviar(chat_id, diagnostico["texto"])
+            _autosave("ciclo de evolução executado")
         elif comando in ("autosave", "git"):
             r = git_autosave.sincronizar_git("comando manual")
             status_emoji = "✅" if r.get("ok") else "❌"
@@ -403,6 +412,11 @@ def _resolver_callback(chat_id, dado: str) -> bool:
         return True
     if acao == "ideologia":
         _enviar(chat_id, conversa.ideologia())
+        return True
+    if acao == "evoluir":
+        _enviar(chat_id, "🔄 Analisando o estado do agente e meus registros...")
+        diagnostico = ciclo.diagnosticar()
+        _enviar(chat_id, diagnostico["texto"])
         return True
     if acao == "pesquisar":
         _AGUARDANDO[str(chat_id)] = "pesquisar"
@@ -627,6 +641,7 @@ def _mapear_botao_fixo(chat_id, texto: str) -> bool:
         "💬 conversar": "conversa", "conversar": "conversa", "conversa": "conversa",
         "🌌 portais": "portais", "portais": "portais", "labirinto": "portais",
         "🧠 ideologia": "ideologia", "ideologia": "ideologia",
+        "🔄 evoluir": "evoluir", "evoluir": "evoluir",
         "📚 aprender": "aprender", "aprender": "aprender",
         "🧠 treinar": "treinar", "treinar": "treinar",
         "🌐 pesquisar": "pesquisar", "pesquisar": "pesquisar",
@@ -736,6 +751,7 @@ def _registrar_comandos() -> None:
         {"command": "portais", "description": "Resolver problema (Sete Portais)"},
         {"command": "ideologia", "description": "Meus princípios"},
         {"command": "autosave", "description": "Salvar aprendizado no GitHub agora"},
+        {"command": "evoluir", "description": "Diagnóstico e plano de evolução"},
         {"command": "aprender", "description": "Aprender um tópico da internet"},
         {"command": "pesquisar", "description": "Pesquisar na internet (DuckDuckGo)"},
         {"command": "treinar", "description": "Ensinar tópico: conteúdo"},

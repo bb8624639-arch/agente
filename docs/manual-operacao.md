@@ -150,6 +150,26 @@ enviados pelo Telegram:
   Enigma, Visão, Inspiração, Inusitado, Escolha, Execução e Reflexão. Guia o
   aprendiz por cada portal e termina com perguntas de refinamento.
 
+### Evolução contínua (aprendizado infinito) — `/evoluir`
+O agente se autoanalisa e **propõe o próximo passo de desenvolvimento** sem
+depender de você — mas sempre *propõe*, nunca auto-publica:
+
+- **Analisa** erros recorrentes (diário + execuções), lacunas de conhecimento
+  e módulos pendentes.
+- **Aprende lições** das próprias execuções (origem `agente`), gravando rascunho
+  de conhecimento para você aprovar com `/aprovar_conh <id>`.
+- **Propõe** módulos novos e novos aprendizados, priorizados pelo histórico.
+
+O relatório traz: estatísticas (conhecimento/módulos), lacunas, erros
+recorrentes, aprendizados gerados e propostas de evolução — tudo determinístico,
+sem custo de LLM. É o motor de **autoexpansão supervisionada**: quanto mais você
+usa, mais o agente sabe o que precisa aprender/desenvolver em seguida.
+
+Como agir no relatório:
+- Aprove aprendizados: `/aprovar_conh <id>`
+- Gere um módulo novo: `/criar_modulo <descrição>` (ou use o botão no menu)
+- Ou rode `/evoluir` outra vez para novo diagnóstico.
+
 ### Autosave no GitHub (execução local/Termux)
 Quando você **aprova um conhecimento**, **treina** o agente ou **cria um
 módulo** pelo Telegram, o bot versão local (Termux) executa `git add + commit +
