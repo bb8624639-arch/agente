@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -22,6 +23,8 @@ import requests
 from ..config import carregar_config, salvar_config
 from ..core import approvals, budget, journal
 from ..core import knowledge as conhecimento
+from ..core import git_autosave
+from ..core import conversa
 from ..orchestrator.executor import executar_pedido
 
 # Estado em memória p/ fluxo "aguardando entrada" (tópico do /aprender etc.).
@@ -57,18 +60,21 @@ def _botao_url(texto: str, url: str) -> dict:
 
 def _teclado_menu() -> list[list[dict]]:
     return [
-        [_botao("📚 Aprender da internet", "menu_aprender"),
-         _botao("🧠 Ensinar (treinar)", "menu_treinar")],
+        [_botao("💬 Conversar", "menu_conversa"),
+         _botao("🌌 Portais (7 passos)", "menu_portais")],
+        [_botao("🧠 Ideologia", "menu_ideologia"),
+         _botao("📚 Aprender da internet", "menu_aprender")],
+        [_botao("🧠 Ensinar (treinar)", "menu_treinar"),
+         _botao("🌐 Pesquisar na internet", "menu_pesquisar")],
         [_botao("⚡ Criar módulo/script", "menu_modulo"),
          _botao("📦 Meus módulos", "menu_modulos")],
         [_botao("🗂 Conhecimentos", "menu_conhecimento"),
          _botao("✅ Aprovações", "menu_status")],
-        [_botao("🌐 Pesquisar na internet", "menu_pesquisar"),
-         _botao("🤔 Pensar", "menu_pensar")],
-        [_botao("📥 Contexto colado", "menu_contexto"),
-         _botao("💵 Cotação do dólar", "menu_cotacao")],
-        [_botao("🆘 Ajuda", "menu_ajuda"),
-         _botao("🔁 Recomeçar", "menu_inicio")],
+        [_botao("🤔 Pensar", "menu_pensar"),
+         _botao("📥 Contexto colado", "menu_contexto")],
+        [_botao("💵 Cotação do dólar", "menu_cotacao"),
+         _botao("🆘 Ajuda", "menu_ajuda")],
+        [_botao("🔁 Recomeçar", "menu_inicio")],
     ]
 
 
@@ -76,6 +82,7 @@ def _teclado_fixo() -> list[list[str]]:
     """Barra persistente (ReplyKeyboard) — botão de START sempre visível."""
     return [
         ["🏠 /start"],
+        ["💬 Conversar", "🌌 Portais", "🧠 Ideologia"],
         ["📚 Aprender", "🧠 Treinar", "🌐 Pesquisar"],
         ["🤔 Pensar", "📥 Contexto", "⚡ Módulo"],
         ["📦 Modulos", "🗂 Conhecimento", "✅ Aprovações"],
@@ -89,6 +96,9 @@ def _enviar_ajuda(chat_id) -> None:
 
 def _texto_ajuda() -> str:
     return ("🧠 *Como usar o agente:*\n\n"
+            "• *Conversar* — converse comigo; respondo com base no que aprendi.\n"
+            "• *Portais* — método dos Sete Portais p/ resolver problemas.\n"
+            "• *Ideologia* — meus princípios de ação.\n"
             "• *Aprender* — buscamos um tópico (Wikipedia) e criamos rascunho.\n"
             "• *Pesquisar* — buscamos na internet (DuckDuckGo) e abrimos páginas autorizadas.\n"
             "• *Treinar* — você me ensina (`tópico: conteúdo`).\n"
@@ -97,9 +107,11 @@ def _texto_ajuda() -> str:
             "• *Módulo* — gero um script, testo e peço aprovação p/ publicar.\n"
             "• *Módulos* — lista módulos registrados.\n"
             "• *Conhecimento* — lista o que aprendi.\n"
-            "• *Aprovações* — aprovações pendentes.\n\n"
+            "• *Aprovações* — aprovações pendentes.\n"
+            "• *Autosave* — aprendizado/aprovações são salvos no GitHub automaticamente.\n\n"
             "_Comandos diretos:_ /aprender · /pesquisar · /treinar · /contexto · "
-            "/pensar · /criar_modulo · /modulos · /conhecimento · /status · /emergencia")
+            "/pensar · /criar_modulo · /modulos · /conhecimento · /status · "
+            "/conversa · /portais · /ideologia · /autosave · /emergencia")
 
 
 def _enviar(chat_id, texto: str) -> None:
@@ -213,6 +225,8 @@ def _handle(corpo: dict) -> None:
             if restante:
                 linha = approvals.decidir(restante, True, por="telegram")
                 _enviar(chat_id, f"Aprovação {restante}: {linha['status']}" if linha else "id inválido")
+                if linha and linha.get("status") == "aprovado":
+                    _autosave(f"aprovacao {restante}")
         elif comando == "recusar":
             if restante:
                 linha = approvals.decidir(restante, False, por="telegram")
@@ -281,8 +295,41 @@ def _handle(corpo: dict) -> None:
                 try:
                     resultado = conhecimento.decidir(int(restante), True, por="telegram")
                     _enviar(chat_id, f"Conhecimento #{restante}: {resultado['status']}" if resultado.get("status") != "inexistente" else "id inexistente")
+                    if resultado.get("status") == "aprovado":
+                        _autosave(f"conhecimento #{restante} aprovado")
                 except ValueError:
                     _enviar(chat_id, "Use: /aprovar <id> de um conhecimento")
+        elif comando == "conversa":
+            if not restante:
+                _AGUARDANDO[str(chat_id)] = "conversa"
+                _enviar(chat_id,
+                        "💬 *Modo conversa*\n\n"
+                        "Fale comigo! Posso conversar sobre o que aprendi, "
+                        "responder com base no conhecimento e resolver problemas "
+                        "com o método dos Sete Portais (`/portais <problema>`).\n"
+                        "Envie sua mensagem.")
+                return
+            _enviar(chat_id, conversa.conversar(restante))
+        elif comando in ("portais", "labirinto"):
+            if not restante:
+                _AGUARDANDO[str(chat_id)] = "portais"
+                _enviar(chat_id,
+                        "🌌 *Método dos Sete Portais*\n\n"
+                        "Envie o problema que o Aprendiz deseja resolver.\n"
+                        "_Ex.: como aumentar vendas sem aumentar gastos?_")
+                return
+            _enviar(chat_id, conversa.portais(restante))
+        elif comando == "ideologia":
+            _enviar(chat_id, conversa.ideologia())
+        elif comando in ("autosave", "git"):
+            r = git_autosave.sincronizar_git("comando manual")
+            status_emoji = "✅" if r.get("ok") else "❌"
+            _enviar(chat_id, f"{status_emoji} Autosave: {r.get('detalhe', r)}")
+        elif comando == "desligar_autosave":
+            import os as _os
+            _os.environ["AE_GIT_AUTOSAVE"] = "0"
+            git_autosave.AUTOSAVE_LIGADO = False
+            _enviar(chat_id, "🔕 Autosave desligado (até reiniciar). Use /autosave para salvar manualmente.")
         elif comando in ("criar_modulo", "criarmodulo") or comando == "modulo":
             if not restante:
                 _enviar(chat_id, "Uso: /criar_modulo <descrição> (ex.: /criar_modulo script que valida CPF)")
@@ -290,6 +337,8 @@ def _handle(corpo: dict) -> None:
             resposta_nova = executar_pedido(f"crie um {restante}")
             curt = resposta_nova["relatorio"].get("0_resposta_curta", "")
             _enviar(chat_id, curt or resposta_nova["relatorio"]["11_relatorio_de_execucao"]["status"])
+            if resposta_nova.get("status") == "aprovacao":
+                _autosave(f"novo módulo: {restante[:50]}")
         elif comando == "modulos" or comando == "listar_modulos":
             _listar_modulos(chat_id)
         elif comando == "menu" or comando == "inicio":
@@ -336,6 +385,24 @@ def _resolver_callback(chat_id, dado: str) -> bool:
                 "Envie no formato `tópico: conteúdo`.\n"
                 "_Ex.: preferências do cliente: nosso maior cliente prefere "
                 "WhatsApp pela manhã_")
+        return True
+    if acao == "conversa":
+        _AGUARDANDO[str(chat_id)] = "conversa"
+        _enviar(chat_id,
+                "💬 *Modo conversa*\n\n"
+                "Fale comigo! Respondo com base no que aprendi e converso "
+                "sobre qualquer tema. Digite sua mensagem:")
+        return True
+    if acao == "portais":
+        _AGUARDANDO[str(chat_id)] = "portais"
+        _enviar(chat_id,
+                "🌌 *Método dos Sete Portais*\n\n"
+                "Envie o problema que você quer resolver e eu o guio pelos "
+                "sete portais (Enigma, Visão, Inspiração, Inusitado, Escolha, "
+                "Execução, Reflexão).")
+        return True
+    if acao == "ideologia":
+        _enviar(chat_id, conversa.ideologia())
         return True
     if acao == "pesquisar":
         _AGUARDANDO[str(chat_id)] = "pesquisar"
@@ -410,6 +477,17 @@ def _listar_conhecimentos(chat_id) -> None:
     _enviar(chat_id, "*Conhecimentos:*\n" + "\n".join(linhas))
 
 
+def _autosave(motivo: str) -> None:
+    """Salva melhorias no GitHub + Termux (commit/push automático)."""
+    try:
+        r = git_autosave.sincronizar_git(motivo)
+        if r.get("ok"):
+            journal.registrar_diario("info", "autosave ok", {"motivo": motivo})
+    except Exception as exc:
+        journal.registrar_diario("erro", "autosave excecao",
+                                 {"motivo": motivo, "erro": str(exc)[:300]})
+
+
 def _status(chat_id) -> None:
     linhas_status = []
     pend = approvals.pendentes()
@@ -455,7 +533,11 @@ def _processar_texto(chat_id, texto: str) -> None:
             r = _importar_contexto(texto)
             _enviar(chat_id, r["resposta_curta"] if r.get("resposta_curta") else str(r))
             return
-        # se o texto parecer um comando de aprendizado (aprender/pesquisar/pensar)
+        # conversa leve (saudações, opiniões, agradecimentos) → modo conversa
+        if _eh_conversacional(texto):
+            _enviar(chat_id, conversa.conversar(texto))
+            return
+        # caso contrário, trata como pedido de tarefa
         _executar_pedido_chat(chat_id, texto)
         return
     if espera == "aprender":
@@ -480,12 +562,19 @@ def _processar_texto(chat_id, texto: str) -> None:
         try:
             id_c = conhecimento.registrar(topico, conteudo, origem="usuario")
             _enviar(chat_id, f"✅ Ensinado! Conhecimento #{id_c} aprovado (origem: você).")
+            _autosave(f"treino: {topico[:50]}")
         except ValueError as exc:
             _enviar(chat_id, f"Erro: {exc}")
+    elif espera == "conversa":
+        _enviar(chat_id, conversa.conversar(texto))
+    elif espera == "portais":
+        _enviar(chat_id, conversa.portais(texto))
     elif espera == "criar_modulo":
         resposta_nova = executar_pedido(f"crie um {texto}")
         curt = resposta_nova["relatorio"].get("0_resposta_curta", "")
         _enviar(chat_id, curt or _resumo_relatorio(resposta_nova["relatorio"]))
+        if resposta_nova.get("status") == "aprovacao":
+            _autosave(f"novo módulo via menu: {texto[:50]}")
     elif espera == "pesquisar":
         _enviar(chat_id, f"🌐 Buscando '{texto}' na internet...")
         r = executar_pedido(f"pesquise {texto}")
@@ -526,6 +615,9 @@ def _mapear_botao_fixo(chat_id, texto: str) -> bool:
     texto_norm = texto.strip().lower()
     mapa = {
         "🏠 /start": "inicio", "/start": "inicio", "🏠": "inicio",
+        "💬 conversar": "conversa", "conversar": "conversa", "conversa": "conversa",
+        "🌌 portais": "portais", "portais": "portais", "labirinto": "portais",
+        "🧠 ideologia": "ideologia", "ideologia": "ideologia",
         "📚 aprender": "aprender", "aprender": "aprender",
         "🧠 treinar": "treinar", "treinar": "treinar",
         "🌐 pesquisar": "pesquisar", "pesquisar": "pesquisar",
@@ -550,6 +642,22 @@ def _mapear_botao_fixo(chat_id, texto: str) -> bool:
 def _resolver_callback_publico(chat_id, acao: str) -> bool:
     """Trata acao do menu pelo nome (sem prefixo menu_), para botões fixos."""
     return _resolver_callback(chat_id, f"menu_{acao}")
+
+
+def _eh_conversacional(texto: str) -> bool:
+    """Detecta intenção de conversa (não: tarefa estrutural do pipeline)."""
+    baixo = texto.strip().lower()
+    # sinais claros de conversa
+    if re.search(r"\b(oi|ol[áa]|opa|e a[ií]|tudo bem|bom dia|boa tarde|boa noite|obrigad|valeu|vlw|hehe|haha|kkkk|risos)\b", baixo):
+        return True
+    if re.search(r"\b(voce e|v[cç] e|voc[eê] é|é voce|o que v[cç]e acha|o que v[cç]e pensa|vamos conversar|conversar)\b", baixo):
+        return True
+    if re.search(r"\b(ideologia|prop[óo]sito|exist[êe]ncia|filosofia|significado da vida|o que [ée] o agente)\b", baixo):
+        return True
+    # não é conversa se parece com pedido de automação/consulta
+    if re.search(r"\b(crie|gere|fa[çc]a|monte|implemente|valide|liste|pre[çc]o|cota[çc][ãa]o|pesquis|aprend|trein|aprovar|rejeitar|status|navegad|site|url)\b", baixo):
+        return False
+    return False
 
 
 def _executar_pedido_chat(chat_id, texto: str) -> None:
@@ -615,6 +723,10 @@ def _registrar_comandos() -> None:
     comandos = [
         {"command": "start", "description": "Iniciar / menu principal"},
         {"command": "menu", "description": "Abrir menu de botões"},
+        {"command": "conversa", "description": "Conversar comigo"},
+        {"command": "portais", "description": "Resolver problema (Sete Portais)"},
+        {"command": "ideologia", "description": "Meus princípios"},
+        {"command": "autosave", "description": "Salvar aprendizado no GitHub agora"},
         {"command": "aprender", "description": "Aprender um tópico da internet"},
         {"command": "pesquisar", "description": "Pesquisar na internet (DuckDuckGo)"},
         {"command": "treinar", "description": "Ensinar tópico: conteúdo"},
