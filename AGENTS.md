@@ -35,6 +35,10 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
   `python3 -m autoexpand.telegram.bot` (direto; `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` no `.env`).
   Comandos de treinamento/expansão: `/treinar`, `/aprender`, `/aprovar_conh`,
   `/rejeitar_conh`, `/conhecimento`, `/criar_modulo`, `/modulos`.
+  Aprendizado autônomo: `/aprender_auto <tópico>` (técnico/público, sem aprovação),
+  `/estudar` ou texto "trilha" (segue a próxima etapa da trilha infinita).
+  Trilhas: `autoexpand/core/aprendizado_auto.py` (linguagens→web→mobile, ordem fixa,
+  posição persistida em `config.aprendizado_idx`; `ciclo_aprendizado(limite, avancar=)`).
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.
 - Tripé de serviços: `./servicos.sh {start|stop|restart|status}` (bot + API + manutenção,
   cada um com auto-restart via `run_*.sh`; logs/PIDs em `state/`).
