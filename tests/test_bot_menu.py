@@ -64,6 +64,9 @@ def test_menu_tem_botoes():
     assert "menu_ideologia" in dados
     # evolução contínua
     assert "menu_evoluir" in dados
+    # restart e push (operações remotas)
+    assert "menu_restart" in dados
+    assert "menu_push" in dados
 
 
 def test_teclado_fixo_tem_start():
@@ -114,3 +117,46 @@ def test_callback_desconhecido_nao_quebra(monkeypatch):
     _mock_requests(monkeypatch)
     # não é menu_* -> retorna False sem erro
     assert tbot._resolver_callback(CHAT, "nao_existe") is False
+
+
+def test_callback_restart_sem_script(monkeypatch):
+    """menu_restart sem run_bot.sh avisa (não quebra, sem rede)."""
+    _mock_requests(monkeypatch)
+    # força caminho sem script: PROJETO é o repo real, então existe; simulamos
+    # removendo para testar o ramo seguro
+    import autoexpand.config as cfg_mod
+    monkeypatch.setattr(tbot, "PROJETO", cfg_mod.PROJETO / "inexistente_dir")
+    _handle_cb("menu_restart", mid=3)
+    assert tbot._AGUARDANDO.get(str(CHAT)) is None
+    tbot._AGUARDANDO.clear()
+
+
+def test_callback_push_mock_autosave(monkeypatch):
+    """menu_push chama git_autosave.sincronizar_git."""
+    _mock_requests(monkeypatch)
+    import autoexpand.core.git_autosave as ga
+    chamadas = []
+
+    def fake_sinc(mensagem):
+        chamadas.append(mensagem)
+        return {"ok": True, "detalhe": "push simulado ok"}
+
+    monkeypatch.setattr(ga, "sincronizar_git", fake_sinc)
+    monkeypatch.setattr(tbot, "git_autosave", ga)
+    monkeypatch.setenv("AE_MODO", "autonomo_controlado")
+    _handle_cb("menu_push", mid=4)
+    assert any("push" in c for c in chamadas)
+
+
+def test_botao_fixo_reiniciar(monkeypatch):
+    _mock_requests(monkeypatch)
+    tbot._AGUARDANDO.clear()
+    assert tbot._mapear_botao_fixo(CHAT, "🔄 Reiniciar") is True
+    tbot._AGUARDANDO.clear()
+
+
+def test_botao_fixo_push_github(monkeypatch):
+    _mock_requests(monkeypatch)
+    tbot._AGUARDANDO.clear()
+    assert tbot._mapear_botao_fixo(CHAT, "📤 Push GitHub") is True
+    tbot._AGUARDANDO.clear()

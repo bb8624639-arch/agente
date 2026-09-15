@@ -37,8 +37,10 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
   `/rejeitar_conh`, `/conhecimento`, `/criar_modulo`, `/modulos`.
   Aprendizado autônomo: `/aprender_auto <tópico>` (técnico/público, sem aprovação),
   `/estudar` ou texto "trilha" (segue a próxima etapa da trilha infinita).
-  Trilhas: `autoexpand/core/aprendizado_auto.py` (linguagens→web→mobile, ordem fixa,
-  posição persistida em `config.aprendizado_idx`; `ciclo_aprendizado(limite, avancar=)`).
+  Operação remota (Termux/servidor): `/push` (commit+push para o GitHub,
+  mesmo fluxo do autosave) e `/reiniciar` (reinicia o bot via run_bot.sh restart).
+  Trilhas: `autoexpand/core/aprendizado_auto.py` (linguagens→web→mobile→ferramentas,
+  ordem fixa, posição persistida em `config.aprendizado_idx`; `ciclo_aprendizado(limite, avancar=)`).
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.
 - Tripé de serviços: `./servicos.sh {start|stop|restart|status}` (bot + API + manutenção,
   cada um com auto-restart via `run_*.sh`; logs/PIDs em `state/`).

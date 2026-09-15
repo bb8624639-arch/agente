@@ -15,12 +15,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
+import threading
 import time
 from pathlib import Path
 
 import requests
 
-from ..config import carregar_config, salvar_config
+from ..config import PROJETO, carregar_config, salvar_config
 from ..core import approvals, budget, journal
 from ..core import knowledge as conhecimento
 from ..core import git_autosave
@@ -77,6 +79,8 @@ def _teclado_menu() -> list[list[dict]]:
          _botao("📥 Contexto colado", "menu_contexto")],
         [_botao("🔄 Evoluir", "menu_evoluir"),
          _botao("💵 Cotação do dólar", "menu_cotacao")],
+        [_botao("🔄 Reiniciar bot", "menu_restart"),
+         _botao("📤 Enviar GitHub (push)", "menu_push")],
         [_botao("🆘 Ajuda", "menu_ajuda"),
          _botao("🔁 Recomeçar", "menu_inicio")],
     ]
@@ -92,6 +96,7 @@ def _teclado_fixo() -> list[list[str]]:
         ["🤔 Pensar", "📥 Contexto", "⚡ Módulo"],
         ["📦 Modulos", "🗂 Conhecimento", "✅ Aprovações"],
         ["💵 Cotação", "🔄 Evoluir", "🆘 Ajuda"],
+        ["🔄 Reiniciar", "📤 Push GitHub", "🔁 Recomeçar"],
     ]
 
 
@@ -123,7 +128,7 @@ def _texto_ajuda() -> str:
             "_Comandos diretos:_ /aprender · /aprender_auto · /estudar · /pesquisar · "
             "/treinar · /contexto · /pensar · /criar_modulo · /modulos · "
             "/conhecimento · /status · /conversa · /portais · /ideologia · "
-            "/autosave · /emergencia")
+            "/autosave · /push · /reiniciar · /emergencia")
 
 
 def _enviar(chat_id, texto: str) -> None:
@@ -382,6 +387,10 @@ def _handle(corpo: dict) -> None:
             _enviar_menu(chat_id)
         elif comando == "start" or comando == "help":
             _enviar_menu(chat_id)
+        elif comando in ("reiniciar", "restart"):
+            _acao_restart(chat_id)
+        elif comando in ("push", "push_github"):
+            _acao_push(chat_id)
         elif comando == "status":
             _status(chat_id)
         elif comando == "emergencia":
@@ -500,6 +509,12 @@ def _resolver_callback(chat_id, dado: str) -> bool:
         curt = resposta["relatorio"].get("0_resposta_curta", "")
         _enviar(chat_id, curt or _resumo_relatorio(resposta["relatorio"]))
         return True
+    if acao in ("restart", "reiniciar", "reiniciar_bot"):
+        _acao_restart(chat_id)
+        return True
+    if acao in ("push", "push_github", "enviar_github"):
+        _acao_push(chat_id)
+        return True
     return True
 
 
@@ -527,6 +542,43 @@ def _listar_conhecimentos(chat_id) -> None:
         estado = "✅" if k["status"] == "aprovado" else ("⏳" if k["status"] == "rascunho" else "❌")
         linhas.append(f"{estado} #{k['id']} {k['topico']} ({k['status']})")
     _enviar(chat_id, "*Conhecimentos:*\n" + "\n".join(linhas))
+
+
+def _acao_restart(chat_id) -> None:
+    """Reinicia o bot no próprio ambiente (Termux/celular ou servidor).
+
+    Executa o script de serviço local (run_bot.sh) num thread separado e
+    aguarda ~1,5s para que o loop de polling (rodando neste processo) seja
+    encerrado pelo novo start; o processo antigo termina sozinho.
+    """
+    script = PROJETO / "run_bot.sh"
+    if not script.exists():
+        _enviar(chat_id, "❌ run_bot.sh não encontrado — o bot não roda sob serviço aqui.")
+        return
+    _enviar(chat_id, "🔄 Reiniciando o bot em ~2s...")
+    threading.Thread(target=_restart_script, args=(script,), daemon=True).start()
+
+
+def _restart_script(script: Path) -> None:
+    try:
+        subprocess.run(["bash", str(script), "restart"], cwd=PROJETO,
+                       timeout=60, capture_output=True, text=True)
+    except (subprocess.SubprocessError, OSError) as exc:
+        journal.registrar_diario("erro", "restart bot falhou",
+                                 {"erro": str(exc)[:300]})
+
+
+def _acao_push(chat_id) -> None:
+    """Envia mudanças/aprendizado para o GitHub (mesma lógica do autosave)."""
+    _enviar(chat_id, "📤 Enviando aprendizado/mudanças para o GitHub...")
+    if getattr(carregar_config(), "modo", "teste") == "teste":
+        _enviar(chat_id, "⚠️ Modo teste: push bloqueado. Mude para um modo real para enviar.")
+        return
+    try:
+        r = git_autosave.sincronizar_git("push manual (botão Telegram)")
+        _enviar(chat_id, ("✅ " if r.get("ok") else "❌ ") + r.get("detalhe", str(r)))
+    except Exception as exc:
+        _enviar(chat_id, f"❌ Push falhou: {exc}")
 
 
 def _autosave(motivo: str) -> None:
@@ -716,6 +768,10 @@ def _mapear_botao_fixo(chat_id, texto: str) -> bool:
         "🗂 conhecimento": "conhecimento", "conhecimento": "conhecimento",
         "✅ aprovações": "status", "aprovações": "status", "aprovações": "status",
         "💵 cotação": "cotacao", "cotação": "cotacao", "cotacao": "cotacao",
+        "🔄 reiniciar": "restart", "reiniciar": "restart",
+        "reiniciar bot": "restart", "🔄 reiniciar bot": "restart",
+        "📤 push github": "push", "push github": "push", "push": "push",
+        "📤 push": "push",
         "🆘 ajuda": "ajuda", "ajuda": "ajuda",
     }
     acao = mapa.get(texto_norm)
@@ -830,6 +886,8 @@ def _registrar_comandos() -> None:
         {"command": "modulos", "description": "Listar módulos"},
         {"command": "conhecimento", "description": "Listar conhecimentos"},
         {"command": "cotacao", "description": "Cotação do dólar (PTAX)"},
+        {"command": "push", "description": "Enviar aprendizado/mudanças para o GitHub"},
+        {"command": "reiniciar", "description": "Reiniciar o bot (Termux/servidor)"},
         {"command": "status", "description": "Ver aprovações e resumo"},
         {"command": "emergencia", "description": "Pausar tudo"},
     ]
