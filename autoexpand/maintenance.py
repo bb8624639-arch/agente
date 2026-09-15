@@ -130,8 +130,8 @@ def executar_manutencao(*, modo: str | None = None) -> dict:
                                  {"modulo": correcao.get("problema")})
 
     # Aprendizado contínuo autônomo: quando não em teste, a manutenção aprende
-    # 1 tópico da trilha (linguagens / web / mobile) — autoaprova conteúdo
-    # técnico público. Em teste permanece simulado (nunca toca rede).
+    # 1 tópico da trilha (linguagens / web / mobile / ferramentas) — autoaprova
+    # conteúdo técnico público. Em teste permanece simulado (nunca toca rede).
     aprendizado_ciclo: dict = {}
     cfg_agora = carregar_config()
     if cfg_agora.modo != "teste":

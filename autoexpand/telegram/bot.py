@@ -107,8 +107,8 @@ def _texto_ajuda() -> str:
             "• *Aprender* — buscamos um tópico (Wikipedia) e criamos rascunho.\n"
             "• *Aprender sozinho* — eu aprendo um tópico técnico sem sua aprovação "
             "(autoaprovo conteúdo técnico de fonte pública).\n"
-            "• *Estudar trilha* — sigo uma trilha (linguagens / web / mobile) "
-            "e aprendo o próximo tópico continuamente.\n"
+            "• *Estudar trilha* — sigo uma trilha (linguagens / web / mobile / "
+            "ferramentas) e aprendo o próximo tópico continuamente.\n"
             "• *Pesquisar* — buscamos na internet (DuckDuckGo) e abrimos páginas autorizadas.\n"
             "• *Treinar* — você me ensina (`tópico: conteúdo`).\n"
             "• *Contexto* — cole um texto grande/documento e eu importo como conhecimento.\n"
@@ -818,7 +818,7 @@ def _registrar_comandos() -> None:
         {"command": "evoluir", "description": "Diagnóstico e plano de evolução"},
         {"command": "aprender", "description": "Aprender um tópico da internet"},
         {"command": "aprender_auto", "description": "Aprender sozinho (técnico, sem aprovação)"},
-        {"command": "estudar", "description": "Seguir trilha de estudos (linguagens/web/mobile)"},
+        {"command": "estudar", "description": "Seguir trilha de estudos (linguagens/web/mobile/ferramentas)"},
         {"command": "pesquisar", "description": "Pesquisar na internet (DuckDuckGo)"},
         {"command": "treinar", "description": "Ensinar tópico: conteúdo"},
         {"command": "contexto", "description": "Importar texto colado como conhecimento"},

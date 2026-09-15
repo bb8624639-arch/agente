@@ -15,6 +15,7 @@ Trilhas:
   1. linguagens  — Python, JavaScript, TypeScript, PHP, Ruby, Go, SQL...
   2. web         — HTTP, HTML, CSS, Playwright, Selenium, REST, APIs...
   3. mobile      — Android, ADB, Termux, Appium, UIAutomator, automatização...
+  4. ferramentas — git, Docker, pytest, venv, CI/CD, depuradores, shell...
 """
 
 from __future__ import annotations
@@ -50,9 +51,17 @@ TRILHAS: dict[str, list[str]] = {
         "Termux para automação no celular",
         "webhooks e intents no Android",
     ],
+    "ferramentas": [
+        "controle de versão com git",
+        "ambientes isolados com Docker",
+        "testes automatizados com pytest",
+        "gerenciamento de dependências (pip/venv)",
+        "integração contínua (CI/CD)",
+        "depuração com breakpoints e logs",
+    ],
 }
 
-ORDEM_TRILHAS = ("linguagens", "web", "mobile")
+ORDEM_TRILHAS = ("linguagens", "web", "mobile", "ferramentas")
 
 # Tamanho da trilha "infinita": após esgotar as sementes, o ciclo gera
 # variações numeradas (ex.: "avançado: [tópico] #2").

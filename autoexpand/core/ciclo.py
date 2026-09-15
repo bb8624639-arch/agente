@@ -211,7 +211,7 @@ def proximo_passo() -> dict:
                 "detalhe": f"Autoaprendizagem do conhecimento pendente: {lacunas[0]} "
                            "(sem aprovação)",
                 "alvo": lacunas[0]}
-    # tudo em dia → seguir a trilha contínua de estudos (linguagens/web/mobile)
+    # tudo em dia → seguir a trilha contínua de estudos (linguagens/web/mobile/ferramentas)
     try:
         from .aprendizado_auto import proximo_topico
         topico = proximo_topico()

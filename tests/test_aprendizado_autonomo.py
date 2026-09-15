@@ -86,6 +86,32 @@ def test_trilha_rotaciona_infinita():
         assert "mobile" in t.lower() or "android" in t.lower() or "automação" in t.lower()
 
 
+def test_trilha_ferramentas_existe_e_progride():
+    """A trilha de ferramentas úteis de programação deve existir e avançar."""
+    sementes = aprendizado_auto.TRILHAS["ferramentas"]
+    assert "controle de versão com git" in sementes
+    assert "ambientes isolados com Docker" in sementes
+    assert "integração contínua (CI/CD)" in sementes
+    # 6 sementes → 12 tópicos = iteracao 2 com "avançado:" ao final do primeiro giro
+    t1 = aprendizado_auto.proximo_topico("ferramentas", idx=0)
+    assert t1 == "controle de versão com git"
+    t7 = aprendizado_auto.proximo_topico("ferramentas", idx=6)
+    assert "avançado:" in t7 and "controle de versão" in t7
+
+
+def test_ordem_global_inclui_ferramentas():
+    """A ordem fixa das trilhas agora inclui ferramentas (4 trilhas)."""
+    assert "ferramentas" in aprendizado_auto.ORDEM_TRILHAS
+    # o índice global alterna as 4 trilhas na ordem
+    t0 = aprendizado_auto.proximo_topico(idx=0)
+    t3 = aprendizado_auto.proximo_topico(idx=3)
+    assert t0 == "programação em Python"
+    assert t3 == "controle de versão com git"
+    # o 4º ciclo volta para linguagens
+    t4 = aprendizado_auto.proximo_topico(idx=4)
+    assert "programação em JavaScript" in t4
+
+
 def test_ciclo_em_modo_teste_simulado():
     r = aprendizado_auto.ciclo_aprendizado(limite_topicos=2)
     assert r.get("simulado") is True
