@@ -26,7 +26,8 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
   Inusitado, Escolha, Execução, Reflexão).
 - **Autosave no GitHub** — quando você aprova conhecimento/cria módulo, o
   agente exporta a memória (`docs/agente-memoria.md`) e faz commit+push
-  automaticamente. Desligue com `AE_GIT_AUTOSAVE=0` ou `/desligar_autosave`.
+  automaticamente (instalação local/Termux). Desligue com `AE_GIT_AUTOSAVE=0`
+  ou `/desligar_autosave`.
 - **Botão fixo de START no Telegram** — barra persistente (ReplyKeyboard)
   sempre visível com atalhos para todas as ações.
 - **Menu no Telegram** — botões para aprender, ensinar, pesquisar, pensar,

@@ -9,13 +9,17 @@ from autoexpand.core import knowledge
 
 @pytest.fixture(autouse=True)
 def isola():
+    from autoexpand.config import carregar_config, salvar_config
     from autoexpand.core.persistence import executar
     executar("DELETE FROM conhecimento")
-    from autoexpand.config import carregar_config, salvar_config
     cfg = carregar_config()
     cfg.modo = "teste"
     salvar_config(cfg)
     yield
+    # limpa o export de memória gerado por testes
+    artefato = Path("docs/agente-memoria.md")
+    if artefato.exists():
+        artefato.unlink()
 
 
 def test_ideologia_tem_principios():
@@ -90,7 +94,6 @@ def test_git_autosave_exporta_memoria():
     from autoexpand.core import git_autosave
     id_c = knowledge.registrar("topico_teste", "conteudo_teste exportavel", origem="usuario")
     knowledge.decidir(id_c, True, por="teste")
-    # garante que ligado para o teste
     orig = git_autosave.AUTOSAVE_LIGADO
     git_autosave.AUTOSAVE_LIGADO = True
     try:

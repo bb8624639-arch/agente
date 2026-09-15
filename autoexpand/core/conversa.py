@@ -53,8 +53,9 @@ def ideologia() -> str:
 def conversar(texto: str) -> str:
     """Responde uma mensagem conversacional com base em conhecimento."""
     texto = texto.strip()
+    baixo = texto.lower()
     # saudações
-    if re.search(r"\b(oi|ola|opa|bom dia|boa tarde|boa noite|e a[ií])\b", texto.lower()):
+    if re.search(r"\b(oi|ola|opa|bom dia|boa tarde|boa noite|e a[ií]|tudo bem)\b", baixo):
         parte = "\n".join(
             f"· *{k['topico']}* — {(k.get('conteudo') or '')[:120]}"
             for k in _fatos_relevantes("", limite=3))
@@ -66,18 +67,18 @@ def conversar(texto: str) -> str:
         return base + "\n\n_Use /portais <problema> para eu resolver como o Mestre do Labirinto._"
 
     # agradecimento
-    if re.search(r"\b(obrigado|obrigada|valeu|vlw)\b", texto.lower()):
+    if re.search(r"\b(obrigado|obrigada|valeu|vlw)\b", baixo):
         return ("De nada! Cada interação me ajuda a tecer novas trilhas. "
                 "Se quiser, me ensine algo ou me dê um problema para os Sete Portais.")
 
     # elogio
-    if re.search(r"\b(voce e|vc e|você é)[ a-z]+? (bom|inteligente|incr[íi]vel|top)\b", texto.lower()):
+    if re.search(r"\b(voce e|vc e|voc[eê] é)[ a-z0-9]+? (bom|inteligente|incr[ií]vel|top)\b", baixo):
         return ("Sou bom porque você me ensina. Minha inteligência é um reflexo "
                 "do conhecimento que registramos juntos — e do meu compromisso "
                 "com a verdade verificável.")
 
     # pergunta existencial / ideologia
-    if re.search(r"\b(significado|prop[óo]sito|exist[êe]ncia|ideologia|filosofia|quem s[aá]o|o que vc[eê] é)\b", texto.lower()):
+    if re.search(r"\b(significado|prop[oó]sito|exist[êe]ncia|ideologia|filosofia|quem s[aá]o|o que v[eê]c e)\b", baixo):
         return ideologia()
 
     # pergunta sobre "como funciona"/"o que pensa" → usa fatos conhecidos
@@ -99,24 +100,6 @@ def conversar(texto: str) -> str:
             "• /portais <problema> — método dos Sete Portais.")
 
 
-PORTAL_TITULOS = [
-    ("1. O Portal do Enigma",
-     "Uma perspectiva diferente do problema — onde mora a oportunidade escondida."),
-    ("2. O Portal da Visão",
-     "O problema real e a meta final do labirinto."),
-    ("3. O Portal da Inspiração",
-     "Ideias de solução, inspiradas pela sabedoria dos antigos."),
-    ("4. O Portal do Inusitado",
-     "Abrindo o caos criativo — 3 ideias fora do padrão."),
-    ("5. O Portal da Escolha",
-     "Selecionando a solução com o discernimento dos filósofos gregos."),
-    ("6. O Portal da Execução",
-     "Plano de implementação real e aplicável."),
-    ("7. O Portal da Reflexão",
-     "Perguntas para refinar o caminho."),
-]
-
-
 def portais(problema: str) -> str:
     """Aplica o Código dos Sete Portais ao problema do aprendiz."""
     problema = problema.strip()
@@ -124,26 +107,23 @@ def portais(problema: str) -> str:
         return ("O Aprendiz deve me entregar um problema para eu trilhar os Sete Portais. "
                 "Ex.: *leia apenas o problema e clique em Enviar*")
 
-    palavra = len(problema.split())
     fatos = _fatos_relevantes(problema, limite=3)
-    base = ""
-
     resposta = [
         f"🌌 *O Mestre do Labirinto Temporal saúda o Aprendiz.*\n",
         f"*O problema:* _{problema[:400]}_\n",
     ]
 
     p1 = (
-        ("Não vejo apenas um obstáculo — vejo um *ponto cego disfarçado de bloqueio*. "
-         "A frase que você usa para descrever o problema já contém a chave: ao nomear, "
-         "você limita. Pergunte-se: *o que este problema me obriga a olhar que eu preferia evitar?*\n")
+        "Não vejo apenas um obstáculo — vejo um *ponto cego disfarçado de bloqueio*. "
+        "A frase que você usa para descrever o problema já contém a chave: ao nomear, "
+        "você limita. Pergunte-se: *o que este problema me obriga a olhar que eu preferia evitar?*\n"
     )
     resposta.append(f"🔮 *1. O Portal do Enigma*\n{p1}")
 
     p2 = (
-        f"O problema essencial é o que gera o sintoma que você descreveu; "
-        f"a meta não é 'resolver isso', e sim *instalar um mecanismo que resolva "
-        f"isso sozinho a partir de agora*.\n"
+        "O problema essencial é o que gera o sintoma que você descreveu; "
+        "a meta não é 'resolver isso', e sim *instalar um mecanismo que resolva "
+        "isso sozinho a partir de agora*.\n"
     )
     resposta.append(f"👁 *2. O Portal da Visão*\n{p2}")
 

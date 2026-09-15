@@ -478,8 +478,17 @@ def _listar_conhecimentos(chat_id) -> None:
 
 
 def _autosave(motivo: str) -> None:
-    """Salva melhorias no GitHub + Termux (commit/push automático)."""
+    """Salva melhorias no GitHub + Termux (commit/push automático).
+
+    Só age em ambiente real (token/chat configurados) E com modo de produção.
+    Em testes (modo=teste) ou sem credenciais, não toca no git.
+    """
+    if not TOKEN or not git_autosave.AUTOSAVE_LIGADO:
+        return
     try:
+        cfg = carregar_config()
+        if getattr(cfg, "modo", "teste") == "teste":
+            return
         r = git_autosave.sincronizar_git(motivo)
         if r.get("ok"):
             journal.registrar_diario("info", "autosave ok", {"motivo": motivo})

@@ -5,12 +5,12 @@ este módulo faz `git commit` + `push` automáticos do estado:
 - exporta os conhecimentos *aprovados* para `docs/agente-memoria.md`;
 - versiona quaisquer novos arquivos/módulos que estejam fora do `.gitignore`.
 
-Controle/segurança:
+Controle/seguranca:
 - Ligar/desligar via env `AE_GIT_AUTOSAVE` (default = "1"; "0" desliga).
-- Operação idempotente e tolerante a falhas: em erro, registra no diário e
+- Operacao idempotente e tolerante a falhas: em erro, registra no diario e
   NUNCA derruba o bot.
-- ATENÇÃO: o exportado vai para o remote — se o conhecimento contiver dados
-  sensíveis, mantenha o repositório privado ou desative o autosave.
+- ATENCAO: o exportado vai para o remote -- se o conhecimento contiver dados
+  sensiveis, mantenha o repositorio privado ou desative o autosave.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from pathlib import Path
 from ..config import PROJETO
 from . import journal
 
-# 1 = ligado (padrão); 0 = desligado
+# 1 = ligado (padrao); 0 = desligado
 AUTOSAVE_LIGADO = os.environ.get("AE_GIT_AUTOSAVE", "1") != "0"
 
 
@@ -33,10 +33,7 @@ def _git(*args: str, cwd: Path | None = None, timeout: int = 30) -> subprocess.C
 
 
 def exportar_memoria() -> str | None:
-    """Escreve docs/agente-memoria.md com os conhecimentos aprovados.
-
-    Devolve o caminho se escrito; None se não houver nada para exportar.
-    """
+    """Escreve docs/agente-memoria.md com os conhecimentos aprovados."""
     from . import knowledge
     aprovados = knowledge.listar("aprovado")
     if not aprovados:
@@ -47,7 +44,7 @@ def exportar_memoria() -> str | None:
         "# Memória do Agente (autosave)",
         "",
         "Conhecimentos aprovados, exportados automaticamente pelo agente "
-        "para versionamento e recuperação.",
+        "para versionamento e recuperacao.",
         "",
         f"_Gerado: autosave. Total: {len(aprovados)} conhecimentos aprovados._",
         "",
@@ -66,20 +63,27 @@ def exportar_memoria() -> str | None:
 
 
 def sincronizar_git(mensagem: str) -> dict:
-    """Commit + push automático das mudanças (memoria + módulos/plugins).
+    """Commit + push automatico das mudancas (memoria + modulos/plugins).
 
     Retorna {"ok": bool, "detalhe": str}. Tolerante a falhas: nunca levanta.
+    Nunca age com modo de teste (protecao contra push acidental em CI/tests).
     """
     if not AUTOSAVE_LIGADO:
         return {"ok": False, "detalhe": "autosave desligado (AE_GIT_AUTOSAVE=0)"}
+    try:
+        from ..config import carregar_config
+        if getattr(carregar_config(), "modo", "teste") == "teste":
+            return {"ok": False, "detalhe": "modo teste: autosave bloqueado"}
+    except Exception:
+        return {"ok": False, "detalhe": "sem config: autosave bloqueado"}
     exportado = exportar_memoria()
 
-    # 1. configura identidade do git local se ainda não tiver
+    # 1. configura identidade do git local se ainda nao tiver
     if not _git("config", "user.email").stdout.strip():
         _git("config", "user.email", "agente@autosave.local")
         _git("config", "user.name", "Agente Autosave")
 
-    # 2. adiciona tudo que é rastreável (memória, módulos fora do .gitignore)
+    # 2. adiciona tudo que e rastreavel (memoria, modulos fora do .gitignore)
     add = _git("add", "-A")
     if add.returncode != 0:
         journal.registrar_diario("erro", "autosave git add falhou",
@@ -98,7 +102,7 @@ def sincronizar_git(mensagem: str) -> dict:
                                  {"saida": (commit.stderr or commit.stdout)[-300:]})
         return {"ok": False, "detalhe": f"git commit falhou: {commit.stderr[-200:]}"}
 
-    # 5. push (oferece mensagem clara se não houver remote configurado)
+    # 5. push (oferece mensagem clara se nao houver remote configurado)
     push = _git("push", "origin", "HEAD")
     if push.returncode != 0:
         journal.registrar_diario("erro", "autosave git push falhou",
