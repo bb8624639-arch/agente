@@ -4,7 +4,7 @@ Conhecimentos aprovados, exportados automaticamente pelo agente para versionamen
 
 _Gerado: autosave. Total: 1 conhecimentos aprovados._
 
-## 3 — topico_teste
+## 4 — topico_teste
 
 conteudo_teste exportavel
 

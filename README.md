@@ -17,6 +17,16 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 - **Capacidade de pensar** — `/pensar` sintetiza o que o agente aprendeu,
   mostra execuções/erros recentes e sugere próximos passos (raciocínio
   determinístico, sem LLM).
+- **Conversa avançada** — `/conversa` permite conversar com o agente; ele
+  responde com base no que aprendeu (e é honesto quando não sabe).
+- **Ideologia** — `/ideologia` explica os princípios que guiam o agente
+  (autonomia com supervisão, verdade verificável, custo consciente).
+- **Método dos Sete Portais** — `/portais <problema>` resolve problemas com
+  uma abordagem estruturada de 7 perspectivas (Enigma, Visão, Inspiração,
+  Inusitado, Escolha, Execução, Reflexão).
+- **Autosave no GitHub** — quando você aprova conhecimento/cria módulo, o
+  agente exporta a memória (`docs/agente-memoria.md`) e faz commit+push
+  automaticamente. Desligue com `AE_GIT_AUTOSAVE=0` ou `/desligar_autosave`.
 - **Botão fixo de START no Telegram** — barra persistente (ReplyKeyboard)
   sempre visível com atalhos para todas as ações.
 - **Menu no Telegram** — botões para aprender, ensinar, pesquisar, pensar,
@@ -36,6 +46,10 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 | `/pesquisar <termo>` | Pesquisa livre na internet (DuckDuckGo) |
 | `/pensar [pergunta]` | Sintetiza conhecimentos e sugere próximo passo |
 | `/contexto <texto>` | Importa texto colado grande como conhecimento |
+| `/conversa` | Conversa com o agente (responde com base no que aprendeu) |
+| `/portais <problema>` | Resolve problema pelo método dos Sete Portais |
+| `/ideologia` | Mostra os princípios do agente |
+| `/autosave` | Força commit+push do aprendizado no GitHub |
 | `/aprovar_conh <id>` / `/rejeitar_conh <id>` | Decide sobre conhecimento |
 | `/modulos` | Lista seus módulos |
 | `/conhecimento` | Lista o que o agente aprendeu |

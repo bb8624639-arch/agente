@@ -140,6 +140,32 @@ enviados pelo Telegram:
 - Comandos são registrados no bot via `setMyCommands` — os atalhos aparecem no
   menu "/" do Telegram.
 
+### Conversa avançada e ideologia
+- `/conversa` — conversa livre com o agente. Ele responde com base no que
+  aprendeu (conhecimento aprovado); se não tem base, diz claramente e sugere
+  aprender/ensinar.
+- `/ideologia` — princípios do agente: autonomia com supervisão, verdade
+  verificável, melhoria contínua, custo consciente, ação sobre ruído.
+- `/portais <problema>` — método dos **Sete Portais** (o "Mestre do Labirinto"):
+  Enigma, Visão, Inspiração, Inusitado, Escolha, Execução e Reflexão. Guia o
+  aprendiz por cada portal e termina com perguntas de refinamento.
+
+### Autosave no GitHub (execução local/Termux)
+Quando você **aprova um conhecimento**, **treina** o agente ou **cria um
+módulo** pelo Telegram, o bot versão local (Termux) executa `git add + commit +
+push` automáticos:
+
+- exporta os conhecimentos aprovados para `docs/agente-memoria.md`;
+- versiona módulos/plugins novos que não estejam no `.gitignore`;
+- registra cada autosave no diário de execuções.
+
+Controles:
+- env `AE_GIT_AUTOSAVE=1` (padrão) liga; `=0` desliga.
+- `/autosave` força um commit+push manual; `/desligar_autosave` desliga na
+  sessão corrente.
+- **Atenção**: o conteúdo vai para o remote. Mantenha o repositório **privado**
+  se houver conhecimento sensível, ou desligue o autosave.
+
 Fluxo completo de expansão: pedido → classificação → geração do rascunho →
 teste em sandbox → sua aprovação → publicação versionada (registry). Nenhuma
 permissão é auto-concedida.
