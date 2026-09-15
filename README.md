@@ -7,10 +7,20 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 
 - **Autoexpansão por script** — descreva a tarefa e o agente gera o módulo
   Python, testa no sandbox e cria uma aprovação pendente.
-- **Aprendizado supervisionado** — aprende da internet (Wikipedia REST) ou
-  direto com você; o conhecimento vira rascunho até ser aprovado.
-- **Menu no Telegram** — botões para aprender, ensinar, criar módulo, listar
-  módulos/conhecimentos/aprovações e cotação do dólar.
+- **Aprendizado supervisionado** — aprende da internet (Wikipedia REST +
+  fallback DuckDuckGo) ou direto com você; o conhecimento vira rascunho até
+  ser aprovado.
+- **Pesquisa na internet total** — comando `/pesquisar` busca em qualquer
+  termo (DuckDuckGo); páginas só são abertas se o domínio estiver autorizado.
+- **Contexto colado** — cole um texto/documento inteiro no chat (ou use
+  `/contexto`) e o agente importa tudo como conhecimento (até 30 mil chars).
+- **Capacidade de pensar** — `/pensar` sintetiza o que o agente aprendeu,
+  mostra execuções/erros recentes e sugere próximos passos (raciocínio
+  determinístico, sem LLM).
+- **Botão fixo de START no Telegram** — barra persistente (ReplyKeyboard)
+  sempre visível com atalhos para todas as ações.
+- **Menu no Telegram** — botões para aprender, ensinar, pesquisar, pensar,
+  criar módulo, listar módulos/conhecimentos/aprovações e cotação do dólar.
 - **Bot + API + manutenção** como serviços persistentes com auto-restart.
 - **Rodando no celular** via Termux (Android) — veja `docs/rodando-termux.md`.
 
@@ -18,16 +28,19 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 
 | Comando | Descrição |
 |---|---|
-| `/menu` ou `/start` | Abre o menu de botões |
+| `/menu` ou `/start` | Abre o menu de botões + barra fixa de START |
 | `/criar_modulo <descrição>` | Gera um módulo e pede aprovação |
 | `/aprovado <id>` | Aprova um módulo pendente |
 | `/treinar` | Ensina `tópico: conteúdo` |
-| `/aprender <tópico>` | Busca na internet e cria rascunho |
+| `/aprender <tópico>` | Busca na internet (Wikipedia → DuckDuckGo) e cria rascunho |
+| `/pesquisar <termo>` | Pesquisa livre na internet (DuckDuckGo) |
+| `/pensar [pergunta]` | Sintetiza conhecimentos e sugere próximo passo |
+| `/contexto <texto>` | Importa texto colado grande como conhecimento |
 | `/aprovar_conh <id>` / `/rejeitar_conh <id>` | Decide sobre conhecimento |
 | `/modulos` | Lista seus módulos |
 | `/conhecimento` | Lista o que o agente aprendeu |
 | `/cotacao` | Cotação do dólar (PTAX/BCB) |
-| `/status` | Saúde do sistema |
+| `/status` | Saúde do sistema + resumo do agente |
 
 ## Instalação local
 

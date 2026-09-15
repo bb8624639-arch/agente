@@ -20,6 +20,14 @@ class Classificacao(NamedTuple):
 
 _REGISTROS = [
     # (regex, categoria, acao, confianca)
+    # ---- comandos explícitos de alta confiança (vencem domínio genérico) ----
+    (r"\b(pesquise|pesquisar?|busque|buscar|procure|procurar|pesquisa na internet|aperte o bot[aã]o de pesquisa|fa[aç]a uma pesquisa)\b",
+     "pesquisa", "ler", 0.98),
+    (r"\b(o que voc[eê] sabe|o que voc[eê] aprendeu|me conte o que|me diga o que voc[eê] sabe|resuma o que|fale sobre o que|fale sobre tudo|tudo que sabe|sintetize|pense sobre|pense|pensar|raciocine|insight|vis[aã]o geral)\b",
+     "pensar", "ler", 0.98),
+    (r"\b(importar contexto|colei aqui|contexto colado|documento abaixo|leia isto|leia o texto|guia abaixo|vou colar)\b",
+     "contexto", "ler", 0.95),
+    # ---- regras existentes ----
     (r"\b(cota[çc][ãa]o|c[aâ]mbio|d[oó]lar|dolar|usd|brl|euro|moeda|convers[ãa]o de moeda)\b",
      "cotacao", "ler", 0.95),
     (r"\b(pre[çc]o|valor|cota[çc][ãa]o|consulta[rv]|buscar|pesquisa[rv]|coletar|extrair)\b",
@@ -47,6 +55,12 @@ _REGISTROS = [
     (r"\b(whatsapp)\b", "mensagens", "enviar_mensagem", 0.7),
     (r"\b(erro|falha|bug|log|diagn[oó]stico|exception|traceback)\b",
      "erro", "diagnosticar", 0.8),
+    (r"\b(aprender|pesquis[ar]?|buscar|procurar|estudar|conhecimento|me ensina|o que [ée]|o que sao|explique|resuma)\b",
+     "pesquisa", "ler", 0.65),
+    (r"\b(pensar|pense|raciocinar|insight|s[ií]ntese|o que voce sabe|me diga o que|vis[ãa]o geral)\b",
+     "pensar", "ler", 0.7),
+    (r"\b(contexto|colar|documento|text[oó] colado|importar|guia|manual)\b",
+     "contexto", "ler", 0.7),
 ]
 
 PERGUNTAS_DESAMBIGUACAO = [
@@ -83,7 +97,8 @@ def classificar(pedido: str) -> Classificacao:
 FAMILIAS: dict[str, str] = {
     "pesquisa": "leitura", "navegador": "leitura", "banco_de_dados": "leitura",
     "pedidos": "leitura", "estoque": "leitura", "produtos": "leitura",
-    "vendas": "leitura", "loja": "leitura",
+    "vendas": "leitura", "loja": "leitura", "contexto": "leitura",
+    "pensar": "raciocinio",
     "mensagens": "comunicacao",
     "criar_modulo": "criacao", "n8n": "criacao",
     "financeiro": "pagamento",

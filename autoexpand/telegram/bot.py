@@ -63,10 +63,43 @@ def _teclado_menu() -> list[list[dict]]:
          _botao("📦 Meus módulos", "menu_modulos")],
         [_botao("🗂 Conhecimentos", "menu_conhecimento"),
          _botao("✅ Aprovações", "menu_status")],
-        [_botao("💵 Cotação do dólar", "menu_cotacao"),
-         _botao("🆘 Ajuda", "menu_ajuda")],
-        [_botao("🔁 Recomeçar", "menu_inicio")],
+        [_botao("🌐 Pesquisar na internet", "menu_pesquisar"),
+         _botao("🤔 Pensar", "menu_pensar")],
+        [_botao("📥 Contexto colado", "menu_contexto"),
+         _botao("💵 Cotação do dólar", "menu_cotacao")],
+        [_botao("🆘 Ajuda", "menu_ajuda"),
+         _botao("🔁 Recomeçar", "menu_inicio")],
     ]
+
+
+def _teclado_fixo() -> list[list[str]]:
+    """Barra persistente (ReplyKeyboard) — botão de START sempre visível."""
+    return [
+        ["🏠 /start"],
+        ["📚 Aprender", "🧠 Treinar", "🌐 Pesquisar"],
+        ["🤔 Pensar", "📥 Contexto", "⚡ Módulo"],
+        ["📦 Modulos", "🗂 Conhecimento", "✅ Aprovações"],
+        ["💵 Cotação", "🆘 Ajuda"],
+    ]
+
+
+def _enviar_ajuda(chat_id) -> None:
+    _enviar(chat_id, _texto_ajuda())
+
+
+def _texto_ajuda() -> str:
+    return ("🧠 *Como usar o agente:*\n\n"
+            "• *Aprender* — buscamos um tópico (Wikipedia) e criamos rascunho.\n"
+            "• *Pesquisar* — buscamos na internet (DuckDuckGo) e abrimos páginas autorizadas.\n"
+            "• *Treinar* — você me ensina (`tópico: conteúdo`).\n"
+            "• *Contexto* — cole um texto grande/documento e eu importo como conhecimento.\n"
+            "• *Pensar* — eu sintetizo o que aprendi e dou sugestões.\n"
+            "• *Módulo* — gero um script, testo e peço aprovação p/ publicar.\n"
+            "• *Módulos* — lista módulos registrados.\n"
+            "• *Conhecimento* — lista o que aprendi.\n"
+            "• *Aprovações* — aprovações pendentes.\n\n"
+            "_Comandos diretos:_ /aprender · /pesquisar · /treinar · /contexto · "
+            "/pensar · /criar_modulo · /modulos · /conhecimento · /status · /emergencia")
 
 
 def _enviar(chat_id, texto: str) -> None:
@@ -85,7 +118,28 @@ def _enviar(chat_id, texto: str) -> None:
         journal.registrar_diario("erro", f"telegram enviar falhou: {exc}")
 
 
+def _enviar_fixo(chat_id) -> None:
+    """Envia barra de botões fixa (ReplyKeyboardMarkup persistente)."""
+    if not TOKEN:
+        return
+    payload = {
+        "chat_id": chat_id,
+        "text": "🤖 Use o menu abaixo. O botão *🏠 /start* está sempre visível:",
+        "reply_markup": {
+            "keyboard": _teclado_fixo(),
+            "resize_keyboard": True,
+            "one_time_keyboard": False,
+            "input_field_placeholder": "Me envie um comando ou toque nos botões…",
+        },
+    }
+    try:
+        requests.post(_url("sendMessage"), json=payload, timeout=15)
+    except requests.RequestException:
+        pass
+
+
 def _enviar_menu(chat_id) -> None:
+    _enviar_fixo(chat_id)
     _enviar_teclado(chat_id,
                     "🤖 *Agente Orquestrador* — Auto-expansão com supervisão\n\n"
                     "Escolha uma ação no menu:",
@@ -198,6 +252,37 @@ def _handle(corpo: dict) -> None:
                         f"*Fonte:* {resultado['fonte']}\n"
                         f"*Resumo:* {resultado['conteudo']}\n\n"
                         f"{resultado['aviso']}")
+        elif comando in ("pesquisar", "pesquisa", "buscar"):
+            if not restante:
+                _enviar(chat_id, "Uso: /pesquisar <termo> (ex.: /pesquisar IA em vendas)")
+                return
+            _enviar(chat_id, f"🌐 Buscando '{restante}' na internet...")
+            r = executar_pedido(f"pesquise {restante}")
+            curt = r.get("relatorio", {}).get("0_resposta_curta", "")
+            _enviar(chat_id, curt or "❌ Não consegui pesquisar.")
+        elif comando == "pensar":
+            if restante:
+                _enviar(chat_id, "🤔 Pensando...")
+                r = executar_pedido(f"pense sobre {restante}")
+            else:
+                _enviar(chat_id, "🤔 Sintetizando o que aprendi...")
+                r = executar_pedido("pensar")
+            curt = r.get("relatorio", {}).get("0_resposta_curta", "")
+            _enviar(chat_id, curt or "🧠 Pensei, mas não tenho nada ainda.")
+        elif comando == "contexto":
+            if not restante:
+                _enviar(chat_id, "Cole o texto/documento agora (ou use /contexto <texto>). Quero que importe tudo:")
+                _AGUARDANDO[str(chat_id)] = "contexto"
+                return
+            r = _importar_contexto(restante)
+            _enviar(chat_id, r["resposta_curta"] if r.get("resposta_curta") else str(r))
+        elif comando in ("aprovar", "aprovar_conh", "aprovarconh"):
+            if restante:
+                try:
+                    resultado = conhecimento.decidir(int(restante), True, por="telegram")
+                    _enviar(chat_id, f"Conhecimento #{restante}: {resultado['status']}" if resultado.get("status") != "inexistente" else "id inexistente")
+                except ValueError:
+                    _enviar(chat_id, "Use: /aprovar <id> de um conhecimento")
         elif comando in ("criar_modulo", "criarmodulo") or comando == "modulo":
             if not restante:
                 _enviar(chat_id, "Uso: /criar_modulo <descrição> (ex.: /criar_modulo script que valida CPF)")
@@ -235,17 +320,7 @@ def _resolver_callback(chat_id, dado: str) -> bool:
     if acao == "inicio" or acao == "ajuda":
         _enviar_menu(chat_id)
         if acao == "ajuda":
-            _enviar(chat_id,
-                    "🧠 *Como usar o menu:*\n\n"
-                    "• *Aprender da internet* — pesquiso um tópico (Wikipedia) "
-                    "e crio um rascunho para você aprovar.\n"
-                    "• *Ensinar (treinar)* — você me ensina algo diretamente "
-                    "(`tópico: conteúdo`).\n"
-                    "• *Criar módulo/script* — gero um script, testo no sandbox "
-                    "e peço sua aprovação para publicar.\n"
-                    "• *Meus módulos* — lista módulos registrados.\n"
-                    "• *Conhecimentos* — lista o que aprendi (aprovados/rascunhos).\n"
-                    "• *Aprovações* — mostra aprovações pendentes (módulos e outras).")
+            _enviar(chat_id, _texto_ajuda())
         return True
     if acao == "aprender":
         _AGUARDANDO[str(chat_id)] = "aprender"
@@ -261,6 +336,27 @@ def _resolver_callback(chat_id, dado: str) -> bool:
                 "Envie no formato `tópico: conteúdo`.\n"
                 "_Ex.: preferências do cliente: nosso maior cliente prefere "
                 "WhatsApp pela manhã_")
+        return True
+    if acao == "pesquisar":
+        _AGUARDANDO[str(chat_id)] = "pesquisar"
+        _enviar(chat_id,
+                "🌐 *Pesquisar na internet*\n\n"
+                "Envie o termo para eu buscar (DuckDuckGo).\n"
+                "_Ex.: tendências de automação comercial_")
+        return True
+    if acao == "pensar":
+        _AGUARDANDO[str(chat_id)] = "pensar"
+        _enviar(chat_id,
+                "🤔 *Pensar*\n\n"
+                "Envie a pergunta (opcional), ou apenas *ok* para eu sintetizar "
+                "tudo o que sei e sugerir próximos passos.")
+        return True
+    if acao == "contexto":
+        _AGUARDANDO[str(chat_id)] = "contexto"
+        _enviar(chat_id,
+                "📥 *Contexto colado*\n\n"
+                "Cole aqui o texto/documento inteiro (posso ler até 30 mil "
+                "caracteres) e eu importo como conhecimento para você aprovar.")
         return True
     if acao == "modulo":
         _AGUARDANDO[str(chat_id)] = "criar_modulo"
@@ -330,6 +426,19 @@ def _status(chat_id) -> None:
         linhas_status.append("*Conhecimentos aguardando você:*")
         for k in pend_conh[:5]:
             linhas_status.append(f"#{k['id']} {k['topico']} (/aprovar_conh {k['id']})")
+    # estatísticas rápidas
+    try:
+        from ..core.memory import estatisticas
+        est = estatisticas()
+        linhas_status.append("")
+        linhas_status.append("*Resumo do agente:*")
+        linhas_status.append(f"· Conhecimento: aprovados={est['conhecimento'].get('aprovado', 0)} "
+                             f"rascunhos={est['conhecimento'].get('rascunho', 0)}")
+        linhas_status.append(f"· Módulos: publicados={est['modulos'].get('publicado', 0)} "
+                             f"rascunhos={est['modulos'].get('rascunho', 0)}")
+        linhas_status.append(f"· Erros recentes: {est['erros_recentes']}")
+    except Exception:
+        pass
     _enviar(chat_id, "\n".join(linhas_status))
 
 
@@ -337,6 +446,16 @@ def _processar_texto(chat_id, texto: str) -> None:
     """Fluxo de texto livre: se aguardando entrada do menu, trata; senão executar."""
     espera = _AGUARDANDO.pop(str(chat_id), None)
     if not espera:
+        # botões da barra fixa chegam como texto — mapear para ações
+        if _mapear_botao_fixo(chat_id, texto):
+            return
+        # texto colado longo (ex.: documento inteiro) → importa como contexto
+        if len(texto.strip()) >= 300 and "\n" in texto:
+            _enviar(chat_id, "📥 Detectei um texto longo/colado. Importando como contexto...")
+            r = _importar_contexto(texto)
+            _enviar(chat_id, r["resposta_curta"] if r.get("resposta_curta") else str(r))
+            return
+        # se o texto parecer um comando de aprendizado (aprender/pesquisar/pensar)
         _executar_pedido_chat(chat_id, texto)
         return
     if espera == "aprender":
@@ -367,6 +486,70 @@ def _processar_texto(chat_id, texto: str) -> None:
         resposta_nova = executar_pedido(f"crie um {texto}")
         curt = resposta_nova["relatorio"].get("0_resposta_curta", "")
         _enviar(chat_id, curt or _resumo_relatorio(resposta_nova["relatorio"]))
+    elif espera == "pesquisar":
+        _enviar(chat_id, f"🌐 Buscando '{texto}' na internet...")
+        r = executar_pedido(f"pesquise {texto}")
+        curt = r.get("relatorio", {}).get("0_resposta_curta", "")
+        _enviar(chat_id, curt or "❌ Não consegui pesquisar.")
+    elif espera == "pensar":
+        _enviar(chat_id, "🤔 Pensando...")
+        r = executar_pedido(f"pense sobre {texto}")
+        curt = r.get("relatorio", {}).get("0_resposta_curta", "")
+        _enviar(chat_id, curt or "🧠 Pensei, mas não tenho nada ainda.")
+    elif espera == "contexto":
+        r = _importar_contexto(texto)
+        _enviar(chat_id, r["resposta_curta"] if r.get("resposta_curta") else str(r))
+
+
+def _importar_contexto(texto: str) -> dict:
+    """Importa texto colado como conhecimento (rascunho p/ aprovação)."""
+    from ..core import knowledge as k
+    texto = texto.strip()
+    if len(texto) < 50:
+        return {"resposta_curta": "Texto muito curto. Cole um documento/pasta com contexto."}
+    topico = "contexto_colado:" + (texto.replace("\n", " ")[:120])
+    try:
+        id_c = k.registrar(topico, texto[:30000], origem="usuario", fonte="telegram")
+    except ValueError as exc:
+        return {"resposta_curta": f"Erro: {exc}"}
+    return {"resposta_curta":
+            f"📥 *Contexto importado* (#{id_c}) — {len(texto)} caracteres.\n"
+            f"_Aguardando aprovação: /aprovar_conh {id_c}_"}
+
+
+def _mapear_botao_fixo(chat_id, texto: str) -> bool:
+    """Mapeia os textos da barra fixa (ReplyKeyboard) para ações do menu.
+
+    Quando o usuário toca num botão da ReplyKeyboard, ele envia *texto*.
+    Aqui traduzimos para o mesmo efeito dos botões inline.
+    """
+    texto_norm = texto.strip().lower()
+    mapa = {
+        "🏠 /start": "inicio", "/start": "inicio", "🏠": "inicio",
+        "📚 aprender": "aprender", "aprender": "aprender",
+        "🧠 treinar": "treinar", "treinar": "treinar",
+        "🌐 pesquisar": "pesquisar", "pesquisar": "pesquisar",
+        "🤔 pensar": "pensar", "pensar": "pensar",
+        "📥 contexto": "contexto", "contexto": "contexto",
+        "⚡ módulo": "modulo", "módulo": "modulo", "modulo": "modulo",
+        "📦 modulos": "modulos", "módulos": "modulos", "módulos": "modulos",
+        "🗂 conhecimento": "conhecimento", "conhecimento": "conhecimento",
+        "✅ aprovações": "status", "aprovações": "status", "aprovações": "status",
+        "💵 cotação": "cotacao", "cotação": "cotacao", "cotacao": "cotacao",
+        "🆘 ajuda": "ajuda", "ajuda": "ajuda",
+    }
+    acao = mapa.get(texto_norm)
+    if not acao:
+        return False
+    # "modulo" e "modulos"/"conhecimento"/"status"/"cotacao" são resolvidos direto;
+    # os demais entram em fluxo aguardando.
+    _resolver_callback_publico(chat_id, acao)
+    return True
+
+
+def _resolver_callback_publico(chat_id, acao: str) -> bool:
+    """Trata acao do menu pelo nome (sem prefixo menu_), para botões fixos."""
+    return _resolver_callback(chat_id, f"menu_{acao}")
 
 
 def _executar_pedido_chat(chat_id, texto: str) -> None:
@@ -399,10 +582,14 @@ def _handle_callback(corpo: dict) -> None:
 
 
 def rodar_polling(intervalo_s: float = 2.0) -> None:
-    """Loop de polling simples. Economia: intervalo configurável, sem IA aqui."""
+    """Loop de polling simples. Economia: intervalo configurável, sem IA aqui.
+
+    No início, registra o botão fixo (setMyCommands) e o menu de botões.
+    """
     if not TOKEN:
         print("TELEGRAM_BOT_TOKEN não definido; Telegram desabilitado.")
         return
+    _registrar_comandos()
     offset = 0
     print("Telegram bot iniciado (polling). Ctrl+C para sair.")
     while True:
@@ -419,6 +606,35 @@ def rodar_polling(intervalo_s: float = 2.0) -> None:
             time.sleep(3)
         except KeyboardInterrupt:
             break
+
+
+def _registrar_comandos() -> None:
+    """Expõe os comandos no campo de texto do Telegram (BotFather automático)."""
+    if not TOKEN:
+        return
+    comandos = [
+        {"command": "start", "description": "Iniciar / menu principal"},
+        {"command": "menu", "description": "Abrir menu de botões"},
+        {"command": "aprender", "description": "Aprender um tópico da internet"},
+        {"command": "pesquisar", "description": "Pesquisar na internet (DuckDuckGo)"},
+        {"command": "treinar", "description": "Ensinar tópico: conteúdo"},
+        {"command": "contexto", "description": "Importar texto colado como conhecimento"},
+        {"command": "pensar", "description": "Sintetizar o que aprendi / responder"},
+        {"command": "criar_modulo", "description": "Gerar script e pedir aprovação"},
+        {"command": "aprovado", "description": "Aprovar módulo ou aprovação por id"},
+        {"command": "aprovar_conh", "description": "Aprovar conhecimento por id"},
+        {"command": "rejeitar_conh", "description": "Rejeitar conhecimento por id"},
+        {"command": "modulos", "description": "Listar módulos"},
+        {"command": "conhecimento", "description": "Listar conhecimentos"},
+        {"command": "cotacao", "description": "Cotação do dólar (PTAX)"},
+        {"command": "status", "description": "Ver aprovações e resumo"},
+        {"command": "emergencia", "description": "Pausar tudo"},
+    ]
+    try:
+        requests.post(_url("setMyCommands"),
+                      json={"commands": comandos}, timeout=15)
+    except requests.RequestException:
+        pass
 
 
 if __name__ == "__main__":

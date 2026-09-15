@@ -77,18 +77,68 @@ def _etapas_cotacao() -> list[dict]:
     ]
 
 
+def _etapas_pesquisa_livre() -> list[dict]:
+    return [
+        {"ordem": 1, "nome": "buscar na internet (DuckDuckGo)", "ferramenta": "browser/search",
+         "permissao": "rede", "deterministico": True},
+        {"ordem": 2, "nome": "abrir paginas permitidas (allowlist)", "ferramenta": "browser/reader",
+         "permissao": "rede", "deterministico": True},
+        {"ordem": 3, "nome": "registrar aprendizado como rascunho", "ferramenta": "core/knowledge",
+         "permissao": "", "deterministico": True},
+    ]
+
+
+def _etapas_pensar() -> list[dict]:
+    return [
+        {"ordem": 1, "nome": "sintetizar conhecimento aprovado", "ferramenta": "core/memory",
+         "permissao": "", "deterministico": True},
+        {"ordem": 2, "nome": "agregar execuções/erros recentes", "ferramenta": "core/journal",
+         "permissao": "", "deterministico": True},
+        {"ordem": 3, "nome": "gerar sugestões acionáveis", "ferramenta": "core/memory",
+         "permissao": "", "deterministico": True},
+    ]
+
+
+def _etapas_contexto() -> list[dict]:
+    return [
+        {"ordem": 1, "nome": "segmentar texto colado (documento)", "ferramenta": "core/knowledge",
+         "permissao": "", "deterministico": True},
+        {"ordem": 2, "nome": "classificar partes relevantes", "ferramenta": "orchestrator/classifier",
+         "permissao": "", "deterministico": True},
+        {"ordem": 3, "nome": "criar rascunhos de conhecimento para aprovação", "ferramenta": "core/knowledge",
+         "permissao": "", "deterministico": True},
+    ]
+
+
 def _plano_para(categoria: str, acao: str) -> dict:
     if categoria == "cotacao":
         return {"categoria": categoria, "etapas": _etapas_cotacao(),
                 "ferramentas": ["connectors/exchange"], "permisoes": ["ler_api"],
                 "riscos": ["fonte externa indisponível", "dado não é contrato"],
                 "aprovacao_necessaria": False, "acao": acao}
-    if categoria in ("pesquisa", "navegador"):
+    if categoria == "navegador":
         return {"categoria": categoria, "etapas": _etapas_leitura(),
                 "ferramentas": ["browser/reader"], "permisoes": ["rede", "ler_api"],
                 "riscos": ["site não autorizado", "layout mudou", "conteúdo dinâmico"],
-                "aprovacao_necessaria": categoria == "navegador",
+                "aprovacao_necessaria": True,
                 "acao": acao}
+    if categoria in ("pesquisa", "buscar"):
+        return {"categoria": categoria, "etapas": _etapas_pesquisa_livre(),
+                "ferramentas": ["browser/search", "browser/reader", "core/knowledge"],
+                "permisoes": ["rede", "ler_api"],
+                "riscos": ["resultados nem sempre permitidos na allowlist",
+                           "conteúdo pode estar desatualizado"],
+                "aprovacao_necessaria": False, "acao": acao}
+    if categoria == "pensar":
+        return {"categoria": categoria, "etapas": _etapas_pensar(),
+                "ferramentas": ["core/memory", "core/journal"], "permisoes": [],
+                "riscos": ["síntese limitada ao que já foi aprendido"],
+                "aprovacao_necessaria": False, "acao": acao}
+    if categoria == "contexto":
+        return {"categoria": categoria, "etapas": _etapas_contexto(),
+                "ferramentas": ["core/knowledge"], "permisoes": [],
+                "riscos": ["texto grande pode gerar muitos rascunhos"],
+                "aprovacao_necessaria": False, "acao": acao}
     if categoria == "banco_de_dados":
         return {"categoria": categoria, "etapas": _etapas_banco(),
                 "ferramentas": ["core/execution"], "permisoes": ["ler_db"],

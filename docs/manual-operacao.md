@@ -122,6 +122,24 @@ enviados pelo Telegram:
 - `/modulos` — lista módulos registrados e seu status (rascunho/publicado).
 - `/status` — mostra aprovações pendentes + conhecimentos aguardando.
 
+### Novas capacidades (autoaprendizagem e raciocínio)
+- `/pesquisar <termo>` — **pesquisa na internet total** (DuckDuckGo), sem
+  precisar de URL. Retorna títulos + links; abre páginas **só se o domínio
+  estiver na allowlist**.
+- `/contexto <texto>` (ou cole um texto longo com quebras de linha) — o agente
+  importa **documentos inteiros colados no chat** como conhecimento (até 30 mil
+  caracteres) e aguarda sua aprovação.
+- `/pensar [pergunta]` — capacidade de **raciocínio local**: sintetiza o que
+  aprendeu (conhecimento aprovado), mostra execuções/erros recentes e sugere
+  próximos passos. Determinístico, sem custo de LLM.
+- `/aprender` agora tem **fallback**: se a Wikipedia não tiver o tópico, busca
+  no DuckDuckGo e monta o rascunho com os snippets.
+- **Botão fixo de START** — o bot envia uma barra persistente (ReplyKeyboard)
+  com atalhos para todas as ações.
+- `/status` inclui **resumo do agente** (conhecimentos/módulos/erros).
+- Comandos são registrados no bot via `setMyCommands` — os atalhos aparecem no
+  menu "/" do Telegram.
+
 Fluxo completo de expansão: pedido → classificação → geração do rascunho →
 teste em sandbox → sua aprovação → publicação versionada (registry). Nenhuma
 permissão é auto-concedida.

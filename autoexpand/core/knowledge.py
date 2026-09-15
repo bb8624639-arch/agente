@@ -29,9 +29,16 @@ _UA = {"User-Agent": "AgenteOrquestrador/1.0 (contato: admin@localhost)"}
 
 
 def registrar(topico: str, conteudo: str, *, origem: str = "usuario", fonte: str = "") -> int:
-    """Cria um rascunho de conhecimento. Devolve o id para aprovação."""
+    """Cria um rascunho de conhecimento. Devolve o id para aprovação.
+
+    Conteúdo maior é aceito (contexto colado): até 30k caracteres para "usuario",
+    para suportar importar documentos inteiros. Tópicos continuam curtos.
+    """
     topico = topico.strip()[:300]
-    conteudo = conteudo.strip()[:4000]
+    antecedente = conteudo.strip()
+    # limite generoso p/ lidar com texto colado; internet/agente ficam em 4000
+    limite = 30000 if origem == "usuario" else 8000
+    conteudo = antecedente[:limite]
     if origem not in ORIGENS:
         origem = "usuario"
     if not topico or not conteudo:
@@ -105,8 +112,15 @@ def buscar_completo(topico: str, limite_palavras: int = 150) -> dict:
 
 
 def aprender_e_registrar(topico: str) -> dict:
-    """Busca na internet e cria rascunho aguardando sua aprovação."""
+    """Busca na internet e cria rascunho aguardando sua aprovação.
+
+    Primeiro tenta Wikipedia; se falhar (sem artigo), faz fallback para
+    a busca genérica (DuckDuckGo) e usa o melhor snippet disponível.
+    """
     candidato = buscar_completo(topico)
+    if "erro" in candidato:
+        # fallback: busca livre (se houver fonte autorizada p/ registro)
+        candidato = buscar_completo_via_web(topico)
     if "erro" in candidato:
         return candidato
     id_criado = registrar(
@@ -118,4 +132,33 @@ def aprender_e_registrar(topico: str) -> dict:
         "fonte": candidato["fonte"],
         "conteudo": candidato["conteudo"],
         "aviso": "rascunho criado — aguardando sua aprovação (/aprovar <id>)",
+    }
+
+
+def buscar_completo_via_web(topico: str, limite: int = 3) -> dict:
+    """Fallback: usa DuckDuckGo p/ montar um rascunho de conhecimento.
+
+    Usa os snippets dos resultados para compor um resumo. Nunca abre página
+    fora da allowlist; só aproveita o que a própria busca retorna.
+    """
+    try:
+        from ..browser.search import buscar_web
+        dados = buscar_web(topico, limite=limite)
+    except Exception as exc:
+        return {"erro": f"fallback de busca falhou: {exc}"}
+    if "erro" in dados:
+        return {"erro": dados["erro"]}
+    resultados = dados.get("resultados", [])
+    if not resultados:
+        return {"erro": f"nada encontrado na internet para '{topico}'"}
+    trechos = [r.get("trecho", "") for r in resultados if r.get("trecho")]
+    conteudo = " ".join(trechos)[:4000]
+    if not conteudo:
+        conteudo = "; ".join(r.get("titulo", "") for r in resultados[:3])[:4000]
+    topico_titulo = resultados[0].get("titulo", topico)
+    return {
+        "topico": topico_titulo,
+        "conteudo": conteudo or topico,
+        "fonte": resultados[0].get("url", "duckduckgo"),
+        "origem": "internet",
     }

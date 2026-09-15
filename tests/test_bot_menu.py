@@ -54,6 +54,26 @@ def test_menu_tem_botoes():
     assert "menu_status" in dados
     assert "menu_cotacao" in dados
     assert "menu_ajuda" in dados
+    # novas capacidades
+    assert "menu_pesquisar" in dados
+    assert "menu_pensar" in dados
+    assert "menu_contexto" in dados
+
+
+def test_teclado_fixo_tem_start():
+    fixo = tbot._teclado_fixo()
+    primeiro = fixo[0]
+    assert "🏠 /start" in primeiro
+    # as linhas todas têm botões
+    assert all(linha for linha in fixo)
+
+
+def test_botao_fixo_inicia_fluxo_pesquisar(monkeypatch):
+    _mock_requests(monkeypatch)
+    tbot._AGUARDANDO.clear()
+    assert tbot._mapear_botao_fixo(CHAT, "🌐 Pesquisar") is True
+    assert tbot._AGUARDANDO.get(str(CHAT)) == "pesquisar"
+    tbot._AGUARDANDO.clear()
 
 
 def test_callback_aprender_inicia_fluxo(monkeypatch):

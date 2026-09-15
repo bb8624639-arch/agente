@@ -50,6 +50,99 @@ def _executar_criar_modulo(pedido: str) -> dict:
             "resposta_curta": msg}
 
 
+def _executar_pesquisa(pedido: str) -> dict:
+    """Pesquisa na internet sem URL prévia (DuckDuckGo) e abre páginas permitidas.
+
+    Se o pedido já contém uma URL explícita, delega para `_executar_leitura`
+    (que continua aplicando a allowlist — um site fora dela permanece bloqueado
+    mesmo em modo autônomo).
+    """
+    from ..browser.allowed import extrair_urls_de
+    if extrair_urls_de(pedido):
+        plano = {"ferramentas": ["browser/reader"]}
+        return _executar_leitura(plano, pedido)
+
+    from ..browser.search import buscar_web, ErroBusca
+    # extrai o termo de busca (remove palavras de comando)
+    termo = _extrair_termo_busca(pedido)
+    try:
+        dados = buscar_web(termo, limite=5)
+    except ErroBusca as exc:
+        return {"ok": False, "erro": str(exc), "status": "falha"}
+    if "erro" in dados:
+        return {"ok": False, "erro": dados["erro"], "status": "falha"}
+    if dados.get("simulado"):
+        return {"ok": True, "resultado": dados, "status": "ok",
+                "resposta_curta": "🔍 _Modo teste_: nenhuma busca real executada."}
+    resultados = dados.get("resultados", [])
+    if not resultados:
+        return {"ok": True, "resultado": dados, "status": "ok",
+                "resposta_curta": "🔍 Nenhum resultado encontrado."}
+    linhas = [f"🔍 *{termo}*"] + [
+        f"{i+1}. {r['titulo']}\n`{r['url']}`"
+        for i, r in enumerate(resultados[:5])]
+    linhas.append("\n_Uma página é aberta se o domínio estiver autorizado. "
+                  "Para abrir, autorize o domínio com /autorizar <site>_")
+    curt = "🔍 **Pesquisa:**\n" + "\n".join(linhas)
+    # abre também a primeira página permitida para leitura do trecho
+    pagina_aberta = ""
+    for r in resultados:
+        try:
+            from ..browser.allowed import verificar_autorizada, SiteNaoAutorizado
+            verificar_autorizada(r["url"])
+        except SiteNaoAutorizado:
+            continue
+        from ..browser.reader import PedidoLeitura, ler_pagina_autorizada, ErroLeitura
+        try:
+            p = ler_pagina_autorizada(PedidoLeitura(url=r["url"]))
+            if p.get("dados_extraidos"):
+                pagina_aberta = "\n📄 *Trecho de " + r["url"] + ":*\n" + p["dados_extraidos"][0][:800]
+                break
+        except (ErroLeitura, Exception):
+            continue
+    return {"ok": True, "resultado": dados, "status": "ok",
+            "resposta_curta": (curt + pagina_aberta) or curt}
+
+
+def _extrair_termo_busca(pedido: str) -> str:
+    import re
+    # remove prefixos de comando comuns
+    for prefixo in ("pesquise ", "pesquisar ", "busque ", "buscar ",
+                    "procure ", "procurar ", "o que é ", "o que sao ",
+                    "explique ", "resuma ", "aprenda sobre "):
+        if pedido.lower().startswith(prefixo):
+            return pedido[len(prefixo):].strip() or pedido
+    return pedido.strip() or pedido
+
+
+def _executar_pensar(pedido: str) -> dict:
+    """Capacidade de raciocínio: sintetiza conhecimento e agrega contexto."""
+    from ..core.memory import pensar
+    pergunta = _extrair_termo_busca(pedido)
+    r = pensar(pergunta)
+    return {"ok": True, "resultado": r, "status": "ok",
+            "resposta_curta": r.get("texto_resposta", "🧠 Pensei, mas não tenho nada ainda.")}
+
+
+def _executar_contexto(texto: str) -> dict:
+    """Importa texto colado longo como conhecimento (rascunho p/ aprovação)."""
+    from ..core import knowledge
+    texto = texto.strip()
+    if len(texto) < 100:
+        return {"ok": False, "erro": "texto muito curto para ser contexto",
+                "status": "desambiguacao"}
+    topico = "contexto_colado: " + (texto[:120].replace("\n", " ")[:80])
+    try:
+        id_c = knowledge.registrar(topico, texto, origem="usuario",
+                                   fonte="telegram_colado")
+    except ValueError as exc:
+        return {"ok": False, "erro": str(exc), "status": "falha"}
+    return {"ok": True, "resultado": {"id": id_c},
+            "status": "ok",
+            "resposta_curta": (f"📥 *Contexto importado* (#{id_c}) — {len(texto)} caracteres.\n"
+                               f"_Aguardando sua aprovação: /aprovar_conh {id_c}")}
+
+
 def _executar_cotacao() -> dict:
     from ..connectors.exchange import cotacao_dolar_hoje, formatar_cotacao
 
@@ -102,7 +195,12 @@ def executar_pedido(pedido: str, *, modo: str | None = None) -> dict:
 
 def _executar_pipeline(pedido: str, cfg) -> dict:
     # b. classificar por regras (sem IA)
-    classificacao = classificar(pedido)
+    # texto longo colado (multi-linha, pouco comando) → força categoria contexto
+    if len(pedido.strip()) >= 300 and "\n" in pedido:
+        from .classifier import Classificacao
+        classificacao = Classificacao("contexto", "ler", 0.99, "texto_colado_long")
+    else:
+        classificacao = classificar(pedido)
     if classificacao.categoria == "desconhecida":
         plano = planejar(pedido, classificacao)
         rel = montar_relatorio(
@@ -174,6 +272,21 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
         resultado = resp
     elif classificacao.categoria == "criar_modulo":
         resp = _executar_criar_modulo(pedido)
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
+    elif classificacao.categoria in ("pesquisa", "buscar"):
+        resp = _executar_pesquisa(pedido)
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
+    elif classificacao.categoria == "pensar":
+        resp = _executar_pensar(pedido)
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
+    elif classificacao.categoria == "contexto":
+        resp = _executar_contexto(pedido)
         status = resp.get("status", "ok" if resp["ok"] else "falha")
         erro = resp.get("erro", "")
         resultado = resp
