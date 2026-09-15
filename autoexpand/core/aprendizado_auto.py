@@ -19,9 +19,7 @@ Trilhas:
 
 from __future__ import annotations
 
-import time
-
-from ..config import MODO_PADRAO, MAX_PAGINAS_POR_EXECUCAO
+from ..config import MAX_PAGINAS_POR_EXECUCAO
 from ..core import knowledge, journal
 from ..core.persistence import consultar
 
@@ -65,41 +63,39 @@ def trilhas_disponiveis() -> dict[str, list[str]]:
     return {nome: list(t) for nome, t in TRILHAS.items()}
 
 
-def proximo_topico(trilha: str | None = None) -> str:
+def _indice_global() -> int:
+    """Posição atual na trilha infinita (persistida no config)."""
+    from ..config import carregar_config
+    return int(carregar_config().aprendizado_idx or 0)
+
+
+def proximo_topico(trilha: str | None = None, *, idx: int | None = None) -> str:
     """Escolhe o próximo tópico da trilha (determinístico, rotaciona infinito).
 
-    Se `trilha` é None, alterna pelas trilhas em ordem fixa com base no
-    contador de execuções do ciclo.
+    Sem `trilha`, alterna na ordem fixa linguagens → web → mobile → ...
+    baseado no contador persistente `aprendizado_idx`.
+
+    `idx` permite pedir o tópico de uma posição exata (usado pelo ciclo para
+    avançar corretamente dentro de uma mesma chamada, sem depender do disco).
     """
+    if idx is None:
+        idx = _indice_global()
     if trilha and trilha in TRILHAS:
         sementes = TRILHAS[trilha]
+        slot = idx % len(sementes)
+        iteracao = (idx // len(sementes)) + 1
     else:
-        # roda pelas trilhas em sequência (linguagens → web → mobile → ...)
-        idx = _contador_execucoes() % len(ORDEM_TRILHAS)
-        trilha = ORDEM_TRILHAS[idx]
-        sementes = TRILHAS[trilha]
+        trilha_atual = ORDEM_TRILHAS[idx % len(ORDEM_TRILHAS)]
+        sementes = TRILHAS[trilha_atual]
+        # dentro da trilha roda pelas sementes; iteração avança a cada volta
+        turnover = idx // len(ORDEM_TRILHAS)
+        slot = turnover % len(sementes)
+        iteracao = (turnover // len(sementes)) + 1
+        topico = sementes[slot]
+        return f"avançado: {topico} (módulo {iteracao})" if iteracao > 1 else topico
 
-    # já aprendemos quantas sementes? Ex: n aprendidas → próximo ímpeto
-    aprendidos = _quantos_aprendidos()
-    indice_semente = aprendidos % len(sementes)
-    iteracao = (aprendidos // len(sementes)) + 1
-    topico = sementes[indice_semente]
-    if iteracao > 1:
-        return f"avançado: {topico} (módulo {iteracao})"
-    return topico
-
-
-def _contador_execucoes() -> int:
-    """Conta execuções do módulo autônomo para variar a trilha."""
-    r = consultar("SELECT COUNT(*) n FROM execucoes WHERE modulo='core/aprendizado_auto'", ())
-    return int(r[0]["n"]) if r else 0
-
-
-def _quantos_aprendidos() -> int:
-    """Conhecimentos aprovados com origem 'agente' (as lições/técnicas)."""
-    r = consultar(
-        "SELECT COUNT(*) n FROM conhecimento WHERE origem='agente' AND status='aprovado'", ())
-    return int(r[0]["n"]) if r else 0
+    topico = sementes[slot]
+    return f"avançado: {topico} (módulo {iteracao})" if iteracao > 1 else topico
 
 
 def _ja_sabemos(topico: str) -> bool:
@@ -125,20 +121,24 @@ def _ja_sabemos(topico: str) -> bool:
 def aprender_topico(topico: str) -> dict:
     """Aprende um tópico autônomo (busca internet → registra conhecimento).
 
-    Retorna dict com id/status/auto. Nunca abre páginas fora da allowlist;
-    apenas usa o resumo da busca (Wikipedia ou DuckDuckGo).
+    Retorna dict com id/status/auto. Usa apenas o *snippet público* da busca
+    (Wikipedia ou DuckDuckGo) — nunca abre páginas completas nem toca na
+    allowlist para aprendizagem (ler snippet é leitura epistêmica segura).
     """
     resultado = knowledge.aprender_autonomo(topico)
     return resultado
 
 
-def ciclo_aprendizado(limite_topicos: int = 2) -> dict:
+def ciclo_aprendizado(limite_topicos: int = 2, *, avancar: bool = True) -> dict:
     """Executa um ciclo de auto-aprendizado: escolhe N tópicos e aprende.
 
     Respeita o orçamento (MAX_PAGINAS_POR_EXECUCAO) e o modo. Devolve
     resumo legível para o Telegram/CLI.
+
+    Se `avancar` (padrão), incrementa o contador persistente `aprendizado_idx`
+    para o próximo ciclo seguir para a próxima posição da trilha infinita.
     """
-    from ..config import carregar_config
+    from ..config import carregar_config, salvar_config
 
     cfg = carregar_config()
     if cfg.modo == "teste":
@@ -146,36 +146,58 @@ def ciclo_aprendizado(limite_topicos: int = 2) -> dict:
             "info", "ciclo de aprendizado autônomo simulado (modo teste)",
             {"limite": limite_topicos})
         return {"ok": True, "simulado": True, "aprendidos": [],
-                "resumo": "modo teste: nenhuma busca real; ciclo simulado."}
+                "resumo": "modo teste: nenhuma busca real; ciclo simulado.",
+                "proximo_topico": proximo_topico()}
 
-    topico_sugerido = proximo_topico()
-    if _ja_sabemos(topico_sugerido):
-        # pula para próximo seguindo a ordem das sementes (sem duplicar)
-        for trilha in ORDEM_TRILHAS:
-            for _ in range(MAX_SEMENTES_POR_TRILHA):
-                candidato = proximo_topico(trilha)
-                if not _ja_sabemos(candidato):
-                    topico_sugerido = candidato
-                    break
-            if not _ja_sabemos(topico_sugerido):
-                break
+    indice = getattr(cfg, "aprendizado_idx", 0) or 0
+
+    def _avanca() -> int:
+        """Incrementa o índice local e devolve o novo valor (persistido só no fim)."""
+        nonlocal indice
+        indice += 1
+        return indice
 
     limitado = min(limite_topicos, MAX_PAGINAS_POR_EXECUCAO)
     aprendidos: list[dict] = []
-    for i in range(limitado):
-        topico = topico_sugerido if i == 0 else proximo_topico()
+
+    def _proximo() -> str:
+        """Próximo tópico na posição local — lê o índice em memória, não do disco."""
+        return proximo_topico(idx=indice)
+
+    for _ in range(limitado):
+        topico = _proximo()
+        if _ja_sabemos(topico):
+            # evita duplicar: avança até achar um tópico ainda não aprendido
+            for _ in range(len(TRILHAS) * max(len(t) for t in TRILHAS.values()) + 1):
+                _avanca()
+                topico = _proximo()
+                if not _ja_sabemos(topico):
+                    break
         try:
             r = aprender_topico(topico)
         except Exception as exc:
             journal.registrar_diario("erro", f"aprendizado autônomo falhou: {exc}")
+            # mesmo sem sucesso, avança para não repetir o mesmo tópico
+            if avancar:
+                _avanca()
             continue
         aprendidos.append(r)
         if not r.get("auto"):
-            break  # não-técnico: para de aprender sozinho, deixa p/ humano
+            # não-técnico: para de aprender sozinho, deixa p/ humano
+            if avancar:
+                _avanca()
+            break
+        if avancar:
+            _avanca()
+
+    if avancar:
+        cfg.aprendizado_idx = indice
+        salvar_config(cfg)
 
     journal.registrar_diario(
         "manutencao", "ciclo de aprendizado autônomo",
-        {"topico": topico_sugerido, "aprendidos": len(aprendidos)})
+        {"topico": [a.get("topico") for a in aprendidos],
+         "aprendidos": len(aprendidos), "indice": getattr(cfg, "aprendizado_idx", 0)})
 
     linhas = []
     for r in aprendidos:
@@ -183,5 +205,6 @@ def ciclo_aprendizado(limite_topicos: int = 2) -> dict:
         linhas.append(f"· {r.get('topico', '?')} → {status} (#{r.get('id', '?')})")
     resumo = ("🧠 *Ciclo de aprendizado autônomo*\n" +
               "\n".join(linhas) if linhas else "Nada novo no ciclo.")
+    resumo += f"\n_Próximo tópico: {proximo_topico()}_"
     return {"ok": True, "simulado": False, "aprendidos": aprendidos,
-            "resumo": resumo}
+            "resumo": resumo, "proximo_topico": proximo_topico()}

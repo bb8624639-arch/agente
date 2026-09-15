@@ -267,9 +267,9 @@ def _handle(corpo: dict) -> None:
             from ..core import aprendizado_auto as _auto
             if not restante:
                 _enviar(chat_id, "⚙️ Escolhendo o próximo tópico da trilha e aprendendo sozinho...")
-                ciclo = _auto.ciclo_aprendizado(limite_topicos=2)
-                _enviar(chat_id, ciclo.get("resumo") or "🧠 Nada novo.")
-                if ciclo.get("aprendidos"):
+                res_ciclo = _auto.ciclo_aprendizado(limite_topicos=2)
+                _enviar(chat_id, res_ciclo.get("resumo") or "🧠 Nada novo.")
+                if res_ciclo.get("aprendidos"):
                     _autosave("ciclo de aprendizado autônomo")
                 return
             _enviar(chat_id, f"⚙️ Aprendendo '{restante}' sem aprovação...")
@@ -619,9 +619,9 @@ def _processar_texto(chat_id, texto: str) -> None:
         baixo = texto.strip().lower()
         if baixo in ("trilha", "estudar trilha", "avançar", "próximo", "proximo"):
             _enviar(chat_id, "🚀 Seguindo a próxima etapa da trilha...")
-            ciclo = _auto.ciclo_aprendizado(limite_topicos=2)
-            _enviar(chat_id, ciclo.get("resumo") or "🧠 Nada novo.")
-            if ciclo.get("aprendidos"):
+            res_ciclo = _auto.ciclo_aprendizado(limite_topicos=2)
+            _enviar(chat_id, res_ciclo.get("resumo") or "🧠 Nada novo.")
+            if res_ciclo.get("aprendidos"):
                 _autosave("ciclo de aprendizado autônomo")
             return
         _enviar(chat_id, f"⚙️ Aprendendo '{texto}' sem aprovação...")

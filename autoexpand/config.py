@@ -48,6 +48,7 @@ class Config:
     dominio_autorizados: list[str] = field(default_factory=list)
     chat_autorizado_telegram: str = ""
     emergencia: bool = False
+    aprendizado_idx: int = 0   # posição atual na trilha de estudos infinita
 
     def caminhos(self) -> Path:
         PASTA_ESTADO.mkdir(parents=True, exist_ok=True)
@@ -68,6 +69,7 @@ def carregar_config() -> Config:
         cfg.dominio_autorizados = dados.get("dominios_autorizados", [])
         cfg.chat_autorizado_telegram = dados.get("chat_autorizado_telegram", "")
         cfg.emergencia = bool(dados.get("emergencia", False))
+        cfg.aprendizado_idx = int(dados.get("aprendizado_idx", 0) or 0)
     cfg.modo = os.environ.get("AE_MODO", cfg.modo)
     if cfg.modo not in MODOS:
         raise ValueError(f"modo inválido: {cfg.modo!r} (use um de {MODOS})")
@@ -81,6 +83,7 @@ def salvar_config(cfg: Config) -> None:
         "dominios_autorizados": sorted(set(cfg.dominio_autorizados)),
         "chat_autorizado_telegram": cfg.chat_autorizado_telegram,
         "emergencia": cfg.emergencia,
+        "aprendizado_idx": int(getattr(cfg, "aprendizado_idx", 0) or 0),
     }
     (PASTA_ESTADO / "config.json").write_text(
         json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
