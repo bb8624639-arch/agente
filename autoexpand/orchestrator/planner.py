@@ -88,6 +88,17 @@ def _etapas_pesquisa_livre() -> list[dict]:
     ]
 
 
+def _etapas_aprender_autonomo() -> list[dict]:
+    return [
+        {"ordem": 1, "nome": "escolher próximo tópico (trilha)", "ferramenta": "core/aprendizado_auto",
+         "permissao": "", "deterministico": True},
+        {"ordem": 2, "nome": "buscar conteúdo técnico (internet)", "ferramenta": "core/knowledge",
+         "permissao": "rede", "deterministico": True},
+        {"ordem": 3, "nome": "autoaprovar se técnico/público ou deixar rascunho",
+         "ferramenta": "core/knowledge", "permissao": "", "deterministico": True},
+    ]
+
+
 def _etapas_pensar() -> list[dict]:
     return [
         {"ordem": 1, "nome": "sintetizar conhecimento aprovado", "ferramenta": "core/memory",
@@ -128,6 +139,13 @@ def _plano_para(categoria: str, acao: str) -> dict:
                 "permisoes": ["rede", "ler_api"],
                 "riscos": ["resultados nem sempre permitidos na allowlist",
                            "conteúdo pode estar desatualizado"],
+                "aprovacao_necessaria": False, "acao": acao}
+    if categoria == "aprendizado":
+        return {"categoria": categoria, "etapas": _etapas_aprender_autonomo(),
+                "ferramentas": ["core/aprendizado_auto", "core/knowledge"],
+                "permisoes": ["ler_api", "rede"],
+                "riscos": ["conteúdo de internet não é contrato",
+                           "autoaprovação apenas para técnico/público"],
                 "aprovacao_necessaria": False, "acao": acao}
     if categoria == "pensar":
         return {"categoria": categoria, "etapas": _etapas_pensar(),

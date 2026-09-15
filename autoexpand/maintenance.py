@@ -129,6 +129,21 @@ def executar_manutencao(*, modo: str | None = None) -> dict:
         journal.registrar_diario("manutencao", correcao["diagnostico"],
                                  {"modulo": correcao.get("problema")})
 
+    # Aprendizado contínuo autônomo: quando não em teste, a manutenção aprende
+    # 1 tópico da trilha (linguagens / web / mobile) — autoaprova conteúdo
+    # técnico público. Em teste permanece simulado (nunca toca rede).
+    aprendizado_ciclo: dict = {}
+    cfg_agora = carregar_config()
+    if cfg_agora.modo != "teste":
+        try:
+            from autoexpand.core.aprendizado_auto import ciclo_aprendizado
+            aprendizado_ciclo = ciclo_aprendizado(limite_topicos=1)
+            journal.registrar_diario(
+                "manutencao", "ciclo autônomo na manutenção",
+                {"aprendidos": len(aprendizado_ciclo.get("aprendidos", []))})
+        except Exception as exc:
+            journal.registrar_diario("erro", f"manutenção/autoaprendizado: {exc}")
+
     status = "ok"
     if not testes_ok:
         status = "atencao"
@@ -159,6 +174,7 @@ def executar_manutencao(*, modo: str | None = None) -> dict:
             "testes": {"pytest_ok": testes_ok,
                        "saida": resultado_teste.stdout[-500:] if not testes_ok else "ok"},
             "correcoes": correcoes,
+            "aprendizado_autonomo": aprendizado_ciclo,
             "status": status,
         },
         "handoff": caminho,

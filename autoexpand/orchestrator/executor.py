@@ -143,6 +143,43 @@ def _executar_contexto(texto: str) -> dict:
                                f"_Aguardando sua aprovação: /aprovar_conh {id_c}")}
 
 
+def _executar_aprendizado_autonomo(pedido: str) -> dict:
+    """Auto-aprendizado determinístico: escolhe trilha e aprende sem aprovação.
+
+    Se o pedido indica um tema (ex.: "aprenda python"), prioriza esse tema;
+    caso contrário escolhe o próximo tópico das trilhas (linguagens/web/mobile).
+    """
+    from ..core import aprendizado_auto
+    termo = _extrair_termo_busca(pedido).strip()
+    # remove verbos de comando para identificar o tema
+    for prefixo in ("aprende", "aprenda", "aprenda sobre", "estude", "estudar",
+                    "aprender", "aprendizado", "sobre"):
+        if termo.lower().startswith(prefixo):
+            termo = termo[len(prefixo):].strip()
+            break
+
+    try:
+        if termo:
+            r = aprendizado_auto.aprender_topico(termo)
+            resultado = {"topico": termo, "aprendido": r.get("auto", False),
+                         "id": r.get("id"), "conteudo": r.get("conteudo", "")[:200],
+                         "fonte": r.get("fonte", "")}
+            return {"ok": True, "resultado": resultado, "status": "ok",
+                    "resposta_curta": (f"🧠 *Aprendi automaticamente:* {termo}\n"
+                                       f"_Aprovado_ (técnico/público)" if r.get("auto")
+                                       else f"🧠 *Aprendi:* {termo}\n_Como rascunho p/ aprovação: /aprovar_conh {r['id']}_")}
+        # sem tema → ciclo completo de trilhas
+        ciclo = aprendizado_auto.ciclo_aprendizado(limite_topicos=2)
+        if ciclo.get("simulado"):
+            return {"ok": True, "resultado": ciclo, "status": "ok",
+                    "resposta_curta": "🧠 _Modo teste: ciclo de aprendizado simulado._"}
+        return {"ok": True, "resultado": ciclo, "status": "ok",
+                "resposta_curta": ciclo.get("resumo", "🧠 Nada novo no ciclo.")}
+    except Exception as exc:
+        return {"ok": False, "erro": f"aprendizado autônomo falhou: {exc}",
+                "status": "falha"}
+
+
 def _executar_cotacao() -> dict:
     from ..connectors.exchange import cotacao_dolar_hoje, formatar_cotacao
 
@@ -282,6 +319,11 @@ def _executar_pipeline(pedido: str, cfg) -> dict:
         resultado = resp
     elif classificacao.categoria == "pensar":
         resp = _executar_pensar(pedido)
+        status = resp.get("status", "ok" if resp["ok"] else "falha")
+        erro = resp.get("erro", "")
+        resultado = resp
+    elif classificacao.categoria == "aprendizado":
+        resp = _executar_aprendizado_autonomo(pedido)
         status = resp.get("status", "ok" if resp["ok"] else "falha")
         erro = resp.get("erro", "")
         resultado = resp

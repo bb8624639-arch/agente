@@ -66,7 +66,9 @@ def _teclado_menu() -> list[list[dict]]:
         [_botao("🧠 Ideologia", "menu_ideologia"),
          _botao("📚 Aprender da internet", "menu_aprender")],
         [_botao("🧠 Ensinar (treinar)", "menu_treinar"),
-         _botao("🌐 Pesquisar na internet", "menu_pesquisar")],
+         _botao("⚙️ Aprender sozinho", "menu_aprender_auto")],
+        [_botao("🌐 Pesquisar na internet", "menu_pesquisar"),
+         _botao("🚀 Estudar trilha", "menu_estudar")],
         [_botao("⚡ Criar módulo/script", "menu_modulo"),
          _botao("📦 Meus módulos", "menu_modulos")],
         [_botao("🗂 Conhecimentos", "menu_conhecimento"),
@@ -85,7 +87,8 @@ def _teclado_fixo() -> list[list[str]]:
     return [
         ["🏠 /start"],
         ["💬 Conversar", "🌌 Portais", "🧠 Ideologia"],
-        ["📚 Aprender", "🧠 Treinar", "🌐 Pesquisar"],
+        ["📚 Aprender", "🧠 Treinar", "🧠 Aprender sozinho"],
+        ["🚀 Estudar trilha", "🌐 Pesquisar"],
         ["🤔 Pensar", "📥 Contexto", "⚡ Módulo"],
         ["📦 Modulos", "🗂 Conhecimento", "✅ Aprovações"],
         ["💵 Cotação", "🔄 Evoluir", "🆘 Ajuda"],
@@ -102,6 +105,10 @@ def _texto_ajuda() -> str:
             "• *Portais* — método dos Sete Portais p/ resolver problemas.\n"
             "• *Ideologia* — meus princípios de ação.\n"
             "• *Aprender* — buscamos um tópico (Wikipedia) e criamos rascunho.\n"
+            "• *Aprender sozinho* — eu aprendo um tópico técnico sem sua aprovação "
+            "(autoaprovo conteúdo técnico de fonte pública).\n"
+            "• *Estudar trilha* — sigo uma trilha (linguagens / web / mobile) "
+            "e aprendo o próximo tópico continuamente.\n"
             "• *Pesquisar* — buscamos na internet (DuckDuckGo) e abrimos páginas autorizadas.\n"
             "• *Treinar* — você me ensina (`tópico: conteúdo`).\n"
             "• *Contexto* — cole um texto grande/documento e eu importo como conhecimento.\n"
@@ -113,9 +120,10 @@ def _texto_ajuda() -> str:
             "• *Autosave* — aprendizado/aprovações são salvos no GitHub automaticamente.\n"
             "• *Evoluir* — /evoluir analisa meus registros e propõe o próximo "
             "passo de aprendizado/desenvolvimento (aprendizado contínuo).\n\n"
-            "_Comandos diretos:_ /aprender · /pesquisar · /treinar · /contexto · "
-            "/pensar · /criar_modulo · /modulos · /conhecimento · /status · "
-            "/conversa · /portais · /ideologia · /autosave · /emergencia")
+            "_Comandos diretos:_ /aprender · /aprender_auto · /estudar · /pesquisar · "
+            "/treinar · /contexto · /pensar · /criar_modulo · /modulos · "
+            "/conhecimento · /status · /conversa · /portais · /ideologia · "
+            "/autosave · /emergencia")
 
 
 def _enviar(chat_id, texto: str) -> None:
@@ -255,6 +263,26 @@ def _handle(corpo: dict) -> None:
                 _enviar(chat_id, f"✅ Ensinado! Conhecimento #{id_criado} aprovado (origem: você).")
             except ValueError as exc:
                 _enviar(chat_id, f"Erro: {exc}")
+        elif comando in ("aprender_auto", "estudar", "estudar_trilha"):
+            from ..core import aprendizado_auto as _auto
+            if not restante:
+                _enviar(chat_id, "⚙️ Escolhendo o próximo tópico da trilha e aprendendo sozinho...")
+                ciclo = _auto.ciclo_aprendizado(limite_topicos=2)
+                _enviar(chat_id, ciclo.get("resumo") or "🧠 Nada novo.")
+                if ciclo.get("aprendidos"):
+                    _autosave("ciclo de aprendizado autônomo")
+                return
+            _enviar(chat_id, f"⚙️ Aprendendo '{restante}' sem aprovação...")
+            r = _auto.aprender_topico(restante)
+            if "erro" in r:
+                _enviar(chat_id, f"❌ {r['erro']}")
+            elif r.get("auto"):
+                _enviar(chat_id, f"✅ *Autoaprendido!* \n*Tópico:* {r['topico']}\n"
+                                 f"*Fonte:* {r['fonte']}\n*Resumo:* {r['conteudo']}\n\n_Conhecimento aprovado automaticamente (técnico/público)._")
+            else:
+                _enviar(chat_id, f"📚 *Aprendizado # {r['id']}*\n"
+                                 f"*Tópico:* {r['topico']}\n*Fonte:* {r['fonte']}\n"
+                                 f"*Resumo:* {r['conteudo']}\n\n_{r['aviso']}_")
         elif comando == "aprender":
             if not restante:
                 _enviar(chat_id, "Uso: /aprender tópico (ex.: /aprender automação comercial)")
@@ -386,6 +414,16 @@ def _resolver_callback(chat_id, dado: str) -> bool:
                 "📚 *Aprender da internet*\n\n"
                 "Envie o tópico que você quer que eu aprenda.\n"
                 "_Ex.: automação comercial, marketing digital, inteligência artificial_")
+        return True
+    if acao in ("aprender_auto", "estudar"):
+        from ..core import aprendizado_auto as _auto
+        _AGUARDANDO[str(chat_id)] = "aprender_auto"
+        _enviar(chat_id,
+                "⚙️ *Aprender sozinho*\n\n"
+                "Envie o tópico técnico para eu aprender **sem sua aprovação** "
+                "(autoaprovo conteúdo técnico de fonte pública).\n"
+                "_Ex.: programação em Python, automação web com Playwright, ADB no Android_\n\n"
+                "Ou envie *trilha* para eu seguir a próxima etapa do meu estudo contínuo.")
         return True
     if acao == "treinar":
         _AGUARDANDO[str(chat_id)] = "treinar"
@@ -576,6 +614,28 @@ def _processar_texto(chat_id, texto: str) -> None:
                     f"*Resumo:* {resultado['conteudo']}\n\n"
                     f"{resultado['aviso']}\n\n"
                     f"Para aprovar: `/aprovar_conh {resultado['id']}`")
+    elif espera == "aprender_auto":
+        from ..core import aprendizado_auto as _auto
+        baixo = texto.strip().lower()
+        if baixo in ("trilha", "estudar trilha", "avançar", "próximo", "proximo"):
+            _enviar(chat_id, "🚀 Seguindo a próxima etapa da trilha...")
+            ciclo = _auto.ciclo_aprendizado(limite_topicos=2)
+            _enviar(chat_id, ciclo.get("resumo") or "🧠 Nada novo.")
+            if ciclo.get("aprendidos"):
+                _autosave("ciclo de aprendizado autônomo")
+            return
+        _enviar(chat_id, f"⚙️ Aprendendo '{texto}' sem aprovação...")
+        r = _auto.aprender_topico(texto)
+        if "erro" in r:
+            _enviar(chat_id, f"❌ {r['erro']}")
+        elif r.get("auto"):
+            _enviar(chat_id, f"✅ *Autoaprendido!*\n*Tópico:* {r['topico']}\n"
+                             f"*Fonte:* {r['fonte']}\n*Resumo:* {r['conteudo']}\n\n"
+                             f"_Conhecimento aprovado automaticamente (técnico/público)._")
+        else:
+            _enviar(chat_id, f"📚 *Aprendizado # {r['id']}*\n*Tópico:* {r['topico']}\n"
+                             f"*Fonte:* {r['fonte']}\n*Resumo:* {r['conteudo']}\n\n"
+                             f"_{r['aviso']}_")
     elif espera == "treinar":
         if ":" not in texto:
             _enviar(chat_id, "Formato: `tópico: conteúdo`. Ex.: `preferências: cliente gosta de e-mail`")
@@ -643,6 +703,10 @@ def _mapear_botao_fixo(chat_id, texto: str) -> bool:
         "🧠 ideologia": "ideologia", "ideologia": "ideologia",
         "🔄 evoluir": "evoluir", "evoluir": "evoluir",
         "📚 aprender": "aprender", "aprender": "aprender",
+        "🧠 aprender sozinho": "aprender_auto", "aprender sozinho": "aprender_auto",
+        "⚙️ aprender sozinho": "aprender_auto", "aprender_auto": "aprender_auto",
+        "🚀 estudar trilha": "estudar", "estudar trilha": "estudar",
+        "trilha": "estudar", "estudar": "estudar",
         "🧠 treinar": "treinar", "treinar": "treinar",
         "🌐 pesquisar": "pesquisar", "pesquisar": "pesquisar",
         "🤔 pensar": "pensar", "pensar": "pensar",
@@ -753,6 +817,8 @@ def _registrar_comandos() -> None:
         {"command": "autosave", "description": "Salvar aprendizado no GitHub agora"},
         {"command": "evoluir", "description": "Diagnóstico e plano de evolução"},
         {"command": "aprender", "description": "Aprender um tópico da internet"},
+        {"command": "aprender_auto", "description": "Aprender sozinho (técnico, sem aprovação)"},
+        {"command": "estudar", "description": "Seguir trilha de estudos (linguagens/web/mobile)"},
         {"command": "pesquisar", "description": "Pesquisar na internet (DuckDuckGo)"},
         {"command": "treinar", "description": "Ensinar tópico: conteúdo"},
         {"command": "contexto", "description": "Importar texto colado como conhecimento"},

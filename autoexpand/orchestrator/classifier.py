@@ -23,6 +23,8 @@ _REGISTROS = [
     # ---- comandos explícitos de alta confiança (vencem domínio genérico) ----
     (r"\b(pesquise|pesquisar?|busque|buscar|procure|procurar|pesquisa na internet|aperte o bot[aã]o de pesquisa|fa[aç]a uma pesquisa)\b",
      "pesquisa", "ler", 0.98),
+    (r"\b(aprenda|aprender|aprenda sobre|estudar|estude|aprender automaticamente|aprenda aut[oô]nom|aprendizado aut[oô]nomo|aprender sozinho|aprender sem aprova[cç][aã]o|autoaprendi?z[ao])\b",
+     "aprendizado", "aprender", 0.97),
     (r"\b(o que voc[eê] sabe|o que voc[eê] aprendeu|me conte o que|me diga o que voc[eê] sabe|resuma o que|fale sobre o que|fale sobre tudo|tudo que sabe|sintetize|pense sobre|pense|pensar|raciocine|insight|vis[aã]o geral)\b",
      "pensar", "ler", 0.98),
     (r"\b(importar contexto|colei aqui|contexto colado|documento abaixo|leia isto|leia o texto|guia abaixo|vou colar)\b",
@@ -98,6 +100,7 @@ FAMILIAS: dict[str, str] = {
     "pesquisa": "leitura", "navegador": "leitura", "banco_de_dados": "leitura",
     "pedidos": "leitura", "estoque": "leitura", "produtos": "leitura",
     "vendas": "leitura", "loja": "leitura", "contexto": "leitura",
+    "aprendizado": "raciocinio",
     "pensar": "raciocinio",
     "mensagens": "comunicacao",
     "criar_modulo": "criacao", "n8n": "criacao",

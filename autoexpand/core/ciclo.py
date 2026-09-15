@@ -207,9 +207,18 @@ def proximo_passo() -> dict:
                 "alvo": mods_rascunho[0]["nome"]}
     lacunas = _lacunas_conhecimento()
     if lacunas:
-        return {"acao": "aprender",
-                "detalhe": f"Recupere conhecimento pendente: {lacunas[0]}",
+        return {"acao": "aprender_auto",
+                "detalhe": f"Autoaprendizagem do conhecimento pendente: {lacunas[0]} "
+                           "(sem aprovação)",
                 "alvo": lacunas[0]}
-    return {"acao": "criar_modulo",
-            "detalhe": "Crie um módulo novo para evoluir o agente",
-            "alvo": ""}
+    # tudo em dia → seguir a trilha contínua de estudos (linguagens/web/mobile)
+    try:
+        from .aprendizado_auto import proximo_topico
+        topico = proximo_topico()
+        return {"acao": "aprender_auto",
+                "detalhe": f"Continuar a trilha de estudos: {topico} (sem aprovação)",
+                "alvo": ""}
+    except Exception:
+        return {"acao": "criar_modulo",
+                "detalhe": "Crie um módulo novo para evoluir o agente",
+                "alvo": ""}
