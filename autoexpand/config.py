@@ -49,6 +49,7 @@ class Config:
     chat_autorizado_telegram: str = ""
     emergencia: bool = False
     aprendizado_idx: int = 0   # posição atual na trilha de estudos infinita
+    acesso_livre_sites: bool = False  # True = ignora allowlist (validação de segurança mantida)
 
     def caminhos(self) -> Path:
         PASTA_ESTADO.mkdir(parents=True, exist_ok=True)
@@ -70,6 +71,7 @@ def carregar_config() -> Config:
         cfg.chat_autorizado_telegram = dados.get("chat_autorizado_telegram", "")
         cfg.emergencia = bool(dados.get("emergencia", False))
         cfg.aprendizado_idx = int(dados.get("aprendizado_idx", 0) or 0)
+        cfg.acesso_livre_sites = bool(dados.get("acesso_livre_sites", False))
     cfg.modo = os.environ.get("AE_MODO", cfg.modo)
     if cfg.modo not in MODOS:
         raise ValueError(f"modo inválido: {cfg.modo!r} (use um de {MODOS})")
@@ -84,6 +86,7 @@ def salvar_config(cfg: Config) -> None:
         "chat_autorizado_telegram": cfg.chat_autorizado_telegram,
         "emergencia": cfg.emergencia,
         "aprendizado_idx": int(getattr(cfg, "aprendizado_idx", 0) or 0),
+        "acesso_livre_sites": bool(getattr(cfg, "acesso_livre_sites", False)),
     }
     (PASTA_ESTADO / "config.json").write_text(
         json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")

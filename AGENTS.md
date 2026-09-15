@@ -45,6 +45,10 @@ LLM econômico depois (somente se configurado via `AE_LLM_*`).
   tipo próprio que usa a V1 API de conversas, não /chat/completions). Chave salva
   no `.env` local (nunca versionado) e ativa o LLM em runtime via
   `llm.reconfigurar()`; `/test_api` testa a conexão.
+  Acesso a sites: `/acesso_livre` consulta, `/acesso_livre on|off` liga/desliga o
+  modo que ignora a allowlist (sempre mantendo validação de segurança: só https,
+  sem localhost/SSRF/IP, sem credenciais). `.onion` só abre se `AE_TOR_PROXY`
+  (ex.: socks5h://127.0.0.1:9050) estiver configurado — é exigência de segurança.
   Trilhas: `autoexpand/core/aprendizado_auto.py` (linguagens→web→mobile→ferramentas,
   ordem fixa, posição persistida em `config.aprendizado_idx`; `ciclo_aprendizado(limite, avancar=)`).
 - Manutenção: `python3 -m autoexpand.maintenance --ciclo`.

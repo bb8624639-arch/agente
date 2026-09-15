@@ -23,7 +23,9 @@ import os
 from flask import Flask, jsonify, request
 
 from ..config import (MODO_PADRAO, carregar_config, limites_json, salvar_config)
-from ..browser.allowed import autorizar_dominio, dominios_autorizados, remover_dominio
+from ..browser.allowed import (acesso_livre, autorizar_dominio,
+                               definir_acesso_livre, dominios_autorizados,
+                               remover_dominio)
 from ..core import approvals, journal, budget, registry
 
 API_TOKEN = os.environ.get("AE_API_TOKEN", "")
@@ -113,6 +115,20 @@ def site_remover():
     remover_dominio(dominio)
     journal.registrar_diario("decisao", f"domínio removido: {dominio}")
     return jsonify({"dominios": dominios_autorizados()})
+
+
+@app.get("/api/sites/acesso_livre")
+def site_acesso_livre_status():
+    return jsonify({"acesso_livre": acesso_livre()})
+
+
+@app.post("/api/sites/acesso_livre")
+def site_acesso_livre_set():
+    corpo = request.get_json(silent=True) or {}
+    ativo = bool(corpo.get("ativo"))
+    definir_acesso_livre(ativo)
+    journal.registrar_diario("decisao", f"acesso livre a sites: {'ativado' if ativo else 'desativado'}")
+    return jsonify({"acesso_livre": acesso_livre()})
 
 
 @app.get("/api/diario")

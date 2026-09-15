@@ -14,9 +14,11 @@ def ambiente_teste():
     cfg = carregar_config()
     cfg.modo = "teste"
     cfg.emergencia = False
+    cfg.acesso_livre_sites = False
     salvar_config(cfg)
     yield
     cfg.emergencia = False
+    cfg.acesso_livre_sites = False
     salvar_config(cfg)
 
 

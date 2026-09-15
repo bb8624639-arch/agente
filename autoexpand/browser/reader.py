@@ -34,6 +34,7 @@ class PedidoLeitura:
     max_paginas: int = MAX_PAGINAS_POR_EXECUCAO
     timeout_s: int = TIMEOUT_SCRIPT_S
     formato: str = "json"      # json (padrão) | texto_resumido
+    proxy: str = ""            # ex.: socks5h://127.0.0.1:9050 (Tor) — vazio = direto
 
 
 def _resumir_texto(texto: str, limite: int = 4000) -> str:
@@ -65,6 +66,16 @@ def ler_pagina_autorizada(pedido: PedidoLeitura) -> dict:
     budget.verificar_limites(paginas_futuras=1)
     budget.registrar_uso(paginas=1)
 
+    import os
+    from urllib.parse import urlparse
+    from .allowed import eh_onion
+    proxy = pedido.proxy or os.environ.get("AE_TOR_PROXY", "")
+    if eh_onion(urlparse(validar_url(pedido.url)).hostname or "") and not proxy:
+        # Segurança: .onion só é alcançável via rede Tor; sem proxy, recusa (mesmo em modo teste).
+        raise ErroLeitura(
+            "endereço .onion exige proxy Tor — configure AE_TOR_PROXY "
+            "(ex.: socks5h://127.0.0.1:9050) e ative o Tor")
+
     inicio = time.monotonic()
     from ..config import carregar_config
     if carregar_config().modo == "teste":
@@ -79,9 +90,14 @@ def ler_pagina_autorizada(pedido: PedidoLeitura) -> dict:
                 "tempo_s": round(time.monotonic() - inicio, 3),
                 "aviso": "modo teste: nenhuma ação externa real executada"}
 
+    proxies = None
+    if proxy:
+        proxies = {"http": proxy, "https": proxy}
+    url = validar_url(pedido.url)
     try:
-        resp = requests.get(validar_url(pedido.url), timeout=pedido.timeout_s,
-                            headers={"User-Agent": "agente-orquestrador/0.1"})
+        resp = requests.get(url, timeout=pedido.timeout_s,
+                            headers={"User-Agent": "agente-orquestrador/0.1"},
+                            proxies=proxies)
     except Exception as exc:
         raise ErroLeitura(f"falha de rede: {exc}") from exc
     if resp.status_code != 200:

@@ -83,8 +83,8 @@ def _teclado_menu() -> list[list[dict]]:
          _botao("📤 Enviar GitHub (push)", "menu_push")],
         [_botao("🔑 Configurar IA (API)", "menu_set_api"),
          _botao("🔌 Testar IA", "menu_test_api")],
-        [_botao("🆘 Ajuda", "menu_ajuda"),
-         _botao("🔁 Recomeçar", "menu_inicio")],
+        [_botao("🔓 Acesso livre a sites", "menu_acesso_livre"),
+         _botao("🆘 Ajuda", "menu_ajuda")],
     ]
 
 
@@ -100,6 +100,7 @@ def _teclado_fixo() -> list[list[str]]:
         ["💵 Cotação", "🔄 Evoluir", "🆘 Ajuda"],
         ["🔄 Reiniciar", "📤 Push GitHub", "🔁 Recomeçar"],
         ["🔑 Configurar IA (API)", "🔌 Testar IA"],
+        ["🔓 Acesso livre a sites"],
     ]
 
 
@@ -131,7 +132,8 @@ def _texto_ajuda() -> str:
             "_Comandos diretos:_ /aprender · /aprender_auto · /estudar · /pesquisar · "
             "/treinar · /contexto · /pensar · /criar_modulo · /modulos · "
             "/conhecimento · /status · /conversa · /portais · /ideologia · "
-            "/autosave · /push · /reiniciar · /set_api · /test_api · /emergencia\n\n"
+            "/autosave · /push · /reiniciar · /set_api · /test_api · /emergencia · "
+            "/acesso_livre\n\n"
             "_Provedores de IA:_ /set_api aceita gemini, openai, openrouter, groq, "
             "deepseek, local (Ollama) e openhands (All Hands Cloud) — "
             "ex.: `/set_api openhands <chave>`")
@@ -419,6 +421,8 @@ def _handle(corpo: dict) -> None:
                 _acao_set_api(chat_id)
         elif comando in ("test_api", "testar_ia", "testar_api", "testapi"):
             _acao_test_api(chat_id)
+        elif comando in ("acesso_livre", "acesso_livre_sites", "liberar_sites", "acessolivre"):
+            _acao_acesso_livre(chat_id, restante)
         elif comando == "status":
             _status(chat_id)
         elif comando == "emergencia":
@@ -549,6 +553,9 @@ def _resolver_callback(chat_id, dado: str) -> bool:
     if acao in ("test_api", "testar_ia"):
         _acao_test_api(chat_id)
         return True
+    if acao in ("acesso_livre", "liberar_sites", "acessolivre"):
+        _acao_acesso_livre(chat_id, "")
+        return True
     return True
 
 
@@ -667,6 +674,41 @@ def _acao_test_api(chat_id) -> None:
         _enviar(chat_id, ("✅ " if ok else "❌ ") + detalhe)
     except Exception as exc:
         _enviar(chat_id, f"❌ Teste falhou: {str(exc)[:200]}")
+
+
+def _acao_acesso_livre(chat_id, restante: str = "") -> None:
+    """Liga/desliga o acesso livre a qualquer site (com validação de segurança).
+
+    `/acesso_livre` (consulta), `/acesso_livre on|off`. A validação de
+    segurança (https, sem localhost/SSRF/IP, sem credenciais na URL) é sempre
+    mantida; apenas a allowlist é ignorada.
+    """
+    from ..browser.allowed import acesso_livre, definir_acesso_livre
+    arg = restante.strip().lower()
+    if arg in ("on", "1", "sim", "s", "true", "ativar", "ligar"):
+        definir_acesso_livre(True)
+        _enviar(chat_id,
+                "🔓 *Acesso livre a sites ATIVADO*\n\n"
+                "Agora posso abrir *qualquer site* (mesmo fora da allowlist), "
+                "incluindo a parcela da deep web que está em HTTPS normal.\n\n"
+                "A validação de segurança continua:\n"
+                "• só HTTPS\n"
+                "• sem localhost/IP bruto (anti-SSRF)\n"
+                "• sem credenciais na URL\n\n"
+                "_Para desativar_: `/acesso_livre off`")
+        return
+    if arg in ("off", "0", "nao", "n", "false", "desativar", "desligar"):
+        definir_acesso_livre(False)
+        _enviar(chat_id,
+                "🔒 *Acesso livre desativado.*\n"
+                "Voltei a respeitar a allowlist (`/autorizar <site>`).")
+        return
+    ativo = acesso_livre()
+    _enviar(chat_id,
+            f"{'🔓 *ATIVO*' if ativo else '🔒 *NÃO ativo*'} — acesso livre a sites.\n\n"
+            "Use `/acesso_livre on` para eu poder abrir qualquer site "
+            "(com validação de segurança), ou `/acesso_livre off` para voltar "
+            "à allowlist.")
 
 
 def _set_api_provedor(chat_id, texto: str) -> None:
