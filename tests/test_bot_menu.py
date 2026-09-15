@@ -62,6 +62,8 @@ def test_menu_tem_botoes():
     assert "menu_conversa" in dados
     assert "menu_portais" in dados
     assert "menu_ideologia" in dados
+    # evolução contínua
+    assert "menu_evoluir" in dados
 
 
 def test_teclado_fixo_tem_start():

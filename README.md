@@ -24,6 +24,11 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 - **Método dos Sete Portais** — `/portais <problema>` resolve problemas com
   uma abordagem estruturada de 7 perspectivas (Enigma, Visão, Inspiração,
   Inusitado, Escolha, Execução, Reflexão).
+- **Evolução contínua (aprendizado infinito)** — `/evoluir` diagnostica o
+  estado do agente (lacunas de conhecimento, erros recorrentes, módulos
+  pendentes), aprende lições das próprias execuções e propõe o próximo passo
+  de desenvolvimento — sempre como rascunho para sua aprovação. Auto-análise
+  determinística, custo zero de LLM.
 - **Autosave no GitHub** — quando você aprova conhecimento/cria módulo, o
   agente exporta a memória (`docs/agente-memoria.md`) e faz commit+push
   automaticamente (instalação local/Termux). Desligue com `AE_GIT_AUTOSAVE=0`
@@ -31,7 +36,8 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 - **Botão fixo de START no Telegram** — barra persistente (ReplyKeyboard)
   sempre visível com atalhos para todas as ações.
 - **Menu no Telegram** — botões para aprender, ensinar, pesquisar, pensar,
-  criar módulo, listar módulos/conhecimentos/aprovações e cotação do dólar.
+  criar módulo, listar módulos/conhecimentos/aprovações, cotação do dólar e
+  evoluir.
 - **Bot + API + manutenção** como serviços persistentes com auto-restart.
 - **Rodando no celular** via Termux (Android) — veja `docs/rodando-termux.md`.
 
@@ -50,6 +56,7 @@ expande por conta própria, mas **nada é publicado sem sua aprovação**.
 | `/conversa` | Conversa com o agente (responde com base no que aprendeu) |
 | `/portais <problema>` | Resolve problema pelo método dos Sete Portais |
 | `/ideologia` | Mostra os princípios do agente |
+| `/evoluir` | Diagnóstico + plano de evolução (aprendizado contínuo) |
 | `/autosave` | Força commit+push do aprendizado no GitHub |
 | `/aprovar_conh <id>` / `/rejeitar_conh <id>` | Decide sobre conhecimento |
 | `/modulos` | Lista seus módulos |
