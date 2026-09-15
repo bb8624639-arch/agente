@@ -1,0 +1,20 @@
+{
+  "modo": "teste",
+  "saude": {
+    "problemas": [],
+    "qtd": 0
+  },
+  "logs": {
+    "contagem_por_tipo": {},
+    "ultimos_erros": []
+  },
+  "testes": {
+    "pytest_ok": false,
+    "saida": "e ...\nFAILED tests/test_execution.py::test_sandbox_ok - assert (False is True)\nFAILED tests/test_gerador.py::test_gerar_modulo_com_nome_e_runtime - assert F...\nFAILED tests/test_gerador.py::test_gerar_modulo_sem_codigo_extra_passa_sandbox\nFAILED tests/test_sandbox.py::test_python_ok - assert (False is True)\nFAILED tests/test_sandbox.py::test_timeout_forcado - AssertionError: assert '...\nFAILED tests/test_sandbox.py::test_erro_excecao_reportado - assert 'boom' in ...\n7 failed, 60 passed in 2.92s\n"
+  },
+  "correcoes": [],
+  "status": "atencao"
+}
+
+Handoff: /data/data/com.termux/files/home/agente/state/handoff-20260914-203609.md
+[2026-09-14 20:36:09] ciclo de manutenção concluído; próximo em 1800s
